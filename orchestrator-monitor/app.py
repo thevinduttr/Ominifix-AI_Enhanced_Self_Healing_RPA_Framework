@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
-from heartbeat_handler import process_heartbeat, bots
+from heartbeat_handler import process_heartbeat, process_failure, bots, failures
 from failure_detector import start_failure_detection
 
 app = FastAPI()
@@ -20,10 +20,16 @@ async def heartbeat(data: dict):
     return process_heartbeat(data)
 
 
+@app.post('/report_failure')
+async def report_failure(data: dict):
+    return process_failure(data)
+
+
 @app.get("/status")
 async def status():
     # Return current bots dictionary
-    return JSONResponse({"bots": bots})
+    # Return bots and recent failures
+    return JSONResponse({"bots": bots, "failures": failures})
 
 
 start_failure_detection()  # Start background monitoring

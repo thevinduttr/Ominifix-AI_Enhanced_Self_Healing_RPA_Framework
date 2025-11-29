@@ -182,11 +182,41 @@
         <div class="muted" style="margin-bottom:8px;font-weight:600">Active Bots (history)</div>
         <canvas id="lineChart" aria-label="Active bots over time"></canvas>
       </div>
+      
+      <div class="chart-card card">
+        <div class="muted" style="margin-bottom:8px;font-weight:600">Recent Failures</div>
+        <div id="recent-failures" class="muted">No failures yet</div>
+      </div>
     </div>
   </div>
 
   <!-- Chart.js -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <script src="/static/script.js"></script>
+
+  <!-- Failure JSON modal -->
+  <div id="failure-modal" style="display:none;position:fixed;inset:0;z-index:1200;align-items:center;justify-content:center">
+    <div id="failure-overlay" style="position:absolute;inset:0;background:rgba(2,6,23,0.6)"></div>
+    <div style="position:relative;max-width:900px;width:calc(100% - 40px);margin:auto;z-index:1210">
+      <div style="background:var(--card);border-radius:10px;padding:16px;color:#e6eef8;box-shadow:0 12px 40px rgba(2,6,23,0.6)">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <div style="font-weight:700">Failure Details</div>
+          <button id="failure-modal-close" class="btn" style="background:transparent;color:var(--muted);border:1px solid rgba(255,255,255,0.04)">Close</button>
+        </div>
+
+        <div id="failure-fields" style="margin-top:12px;display:flex;gap:12px;flex-wrap:wrap"></div>
+
+        <div style="margin-top:12px;display:flex;gap:8px;align-items:center">
+          <button id="failure-render-dom" class="btn" style="background:transparent;color:var(--muted);border:1px solid rgba(255,255,255,0.04)">Render DOM</button>
+          <div class="muted">(renders DOM snapshot in a sandboxed frame; scripts are blocked)</div>
+        </div>
+
+        <div id="failure-dom-container" style="margin-top:12px;display:none;border-radius:8px;overflow:hidden;border:1px solid rgba(255,255,255,0.04)"></div>
+
+        <div style="margin-top:12px"><strong>Raw JSON</strong></div>
+        <pre id="failure-json-pre" style="margin-top:8px;background:rgba(0,0,0,0.06);padding:12px;border-radius:6px;max-height:420px;overflow:auto;color:#e6eef8;font-size:13px"></pre>
+      </div>
+    </div>
+  </div>
 </body>
 </html>
