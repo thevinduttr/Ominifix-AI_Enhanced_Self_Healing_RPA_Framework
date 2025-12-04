@@ -1,2 +1,0 @@
-{"timestamp": "2025-11-23T13:28:56.574290Z", "session_id": "se-4410653184", "component": "selenium_flow", "event_type": "navigation_end", "selector": null, "message": "loaded https://example.com", "status": "success", "meta": {"url": "https://example.com"}}
-{"timestamp": "2025-11-27T07:59:12.916886Z", "session_id": "se-4398907152", "component": "selenium_flow", "event_type": "navigation_end", "selector": null, "message": "loaded https://example.com", "status": "success", "meta": {"url": "https://example.com"}}
