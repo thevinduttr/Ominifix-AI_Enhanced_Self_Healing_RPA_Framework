@@ -1,0 +1,86 @@
+{% extends "base.html" %}
+{% block content %}
+
+<section class="card">
+  <h2>Locator Report</h2>
+  <p class="small-text">
+    <strong>Page:</strong>
+    <code>{{ report.page_url }}</code><br />
+    <strong>Element Role:</strong>
+    {{ report.element_role or "N/A" }}<br />
+    <strong>Expected Text:</strong>
+    {{ report.expected_text or "N/A" }}
+  </p>
+
+  {% if best %}
+    <div class="best-locator-block">
+      <h3>Selected Best Locator for Healing Engine</h3>
+      <p class="small-text">
+        <strong>Tag:</strong> {{ best.tag }}<br />
+        <strong>Text:</strong> "{{ best.text }}"
+      </p>
+      <p class="small-text">
+        <strong>Confidence:</strong>
+        <span class="badge badge-good">
+          {{ '%.3f'|format(best.confidence or 0) }}
+        </span>
+      </p>
+      <p class="small-text">
+        <strong>Long XPath:</strong><br />
+        <code class="code-block-inline">{{ best.long_xpath }}</code>
+      </p>
+      <p class="hint">
+        This is the locator that will be passed to the Code Healing Engine
+        in the integration phase.
+      </p>
+    </div>
+  {% else %}
+    <p>No best locator was selected.</p>
+  {% endif %}
+</section>
+
+<section class="card">
+  <h3>All Candidate Elements (Ranked by ML Confidence)</h3>
+  <div class="table-wrapper">
+    <table>
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>Tag</th>
+          <th>Text</th>
+          <th>Role</th>
+          <th>ID</th>
+          <th>Class</th>
+          <th>Conf.</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for c in candidates %}
+        <tr class="{% if loop.index0 == 0 %}row-best{% endif %}">
+          <td>{{ loop.index }}</td>
+          <td>{{ c.tag }}</td>
+          <td>{{ c.text }}</td>
+          <td>{{ c.rough_role }}</td>
+          <td>{{ c.id }}</td>
+          <td>{{ c.class }}</td>
+          <td>{{ '%.3f'|format(c.confidence or 0) }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section class="card">
+  <h3>Raw JSON Output (For Code Healing Engine)</h3>
+  <button class="btn btn-secondary btn-small" type="button" onclick="toggleJson()">
+    Toggle JSON View
+  </button>
+  <pre id="json-block" class="json-block">{{ raw_json }}</pre>
+</section>
+
+<a href="{{ url_for('dashboard') }}" class="btn btn-secondary">
+  ← Back to Dashboard
+</a>
+
+{% endblock %}

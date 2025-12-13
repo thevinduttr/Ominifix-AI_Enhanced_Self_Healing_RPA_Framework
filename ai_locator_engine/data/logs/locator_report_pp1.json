@@ -1,0 +1,24 @@
+{
+  "page_url": "file:///D:/A SLIIT/A Years/Y4S1/RP/Project/Ominifix-AI_Enhanced_Self_Healing_RPA_Framework/ai_locator_engine/demo_pages/login_v2_changed.html",
+  "element_role": "primary_action",
+  "expected_text": "Login",
+  "best_locator": {
+    "long_xpath": "/html[1]/body[1]/div[1]/button[1]",
+    "tag": "button",
+    "text": "Sign In",
+    "confidence": 2.138198121777226e-05
+  },
+  "candidates": [
+    {
+      "tag": "button",
+      "text": "Sign In",
+      "id": "primary-action",
+      "class": "primary-action",
+      "type": null,
+      "long_xpath": "/html[1]/body[1]/div[1]/button[1]",
+      "rough_role": "primary_action",
+      "confidence": 2.138198121777226e-05
+    }
+  ],
+  "analysis_notes": "DOM + CV + ML ranking executed."
+}

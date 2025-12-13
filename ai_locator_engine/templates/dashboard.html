@@ -1,0 +1,136 @@
+{% extends "base.html" %}
+{% block content %}
+
+<section class="grid-2">
+  <div class="card">
+    <h2>Component Overview</h2>
+    <p class="text-muted">
+      This UI demonstrates how the <strong>Element Locator Engine</strong>
+      reacts when a Playwright/Selenium-style RPA bot fails due to UI changes.
+      The Orchestrator simulation triggers a failure on a sample login page,
+      and this component analyses:
+    </p>
+    <ul class="bullet-list">
+      <li>HTML snapshot (DOM structure)</li>
+      <li>Page screenshot (for Computer Vision)</li>
+      <li>Bot context (intended element role & expected text)</li>
+    </ul>
+    <p class="text-muted">
+      It then proposes new locators with confidence scores using
+      <strong>DOM analysis</strong>, <strong>Computer Vision signals</strong>,
+      and a <strong>trained ML model</strong>.
+    </p>
+
+    <div class="actions-row">
+      <form action="{{ url_for('run_demo') }}" method="get" onsubmit="showLoader()">
+        <button class="btn btn-primary" type="submit">
+          ▶ Run Failure Demo
+        </button>
+      </form>
+      <a href="{{ url_for('view_report') }}" class="btn btn-secondary">
+        View Last Report
+      </a>
+    </div>
+    <p class="hint">
+      Tip: During PP1, click <strong>Run Failure Demo</strong> while explaining
+      the pipeline: Orchestrator → Locator Engine → Report.
+    </p>
+  </div>
+
+  <div class="card">
+    <h2>Pipeline Summary</h2>
+    <ol class="pipeline-list">
+      <li>
+        <span class="pipeline-badge">1</span>
+        <div>
+          <strong>Bot Failure Detected</strong>
+          <p class="small-text">
+            A demo Selenium bot fails to find the old “Login” button on
+            <code>login_v2_changed.html</code>.
+          </p>
+        </div>
+      </li>
+      <li>
+        <span class="pipeline-badge">2</span>
+        <div>
+          <strong>Context Sent by Orchestrator</strong>
+          <p class="small-text">
+            Page URL, HTML snapshot, screenshot, and metadata
+            (role = <code>primary_action</code>, expected text = “Login”)
+            are passed to this component.
+          </p>
+        </div>
+      </li>
+      <li>
+        <span class="pipeline-badge">3</span>
+        <div>
+          <strong>Locator Engine Analysis</strong>
+          <p class="small-text">
+            DOM layer extracts all interactive elements, CV layer
+            estimates visual similarity, and an ML model ranks
+            candidates with confidence scores.
+          </p>
+        </div>
+      </li>
+      <li>
+        <span class="pipeline-badge">4</span>
+        <div>
+          <strong>Locator Report Generated</strong>
+          <p class="small-text">
+            Highest-confidence locator is selected and exposed as JSON
+            to the future Code Healing Engine.
+          </p>
+        </div>
+      </li>
+    </ol>
+  </div>
+</section>
+
+{% if report %}
+<section class="card">
+  <h2>Last Run Snapshot</h2>
+  <div class="last-run-grid">
+    <div>
+      <p class="small-text">
+        <strong>Page:</strong><br />
+        <code>{{ report.page_url }}</code>
+      </p>
+      <p class="small-text">
+        <strong>Element Role:</strong>
+        {{ report.element_role or "N/A" }}<br />
+        <strong>Expected Text:</strong>
+        {{ report.expected_text or "N/A" }}
+      </p>
+    </div>
+    {% if report.best_locator %}
+    <div class="best-locator-summary">
+      <span class="badge badge-good">Best Candidate</span>
+      <p class="small-text">
+        <strong>Tag:</strong> {{ report.best_locator.tag }}<br />
+        <strong>Text:</strong> "{{ report.best_locator.text }}"
+      </p>
+      <p class="small-text">
+        <strong>Confidence:</strong>
+        {{ '%.3f'|format(report.best_locator.confidence or 0) }}
+      </p>
+      <p class="small-text truncate">
+        <strong>Long XPath:</strong><br />
+        <code>{{ report.best_locator.long_xpath }}</code>
+      </p>
+      <a href="{{ url_for('view_report') }}" class="btn btn-secondary btn-small">
+        View Full Candidate List →
+      </a>
+    </div>
+    {% else %}
+    <div>
+      <p class="small-text">
+        No successful locator found in the last run. Run the demo to generate
+        a fresh report.
+      </p>
+    </div>
+    {% endif %}
+  </div>
+</section>
+{% endif %}
+
+{% endblock %}

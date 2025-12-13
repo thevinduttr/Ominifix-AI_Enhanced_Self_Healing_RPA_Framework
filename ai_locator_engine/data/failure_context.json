@@ -1,0 +1,13 @@
+{
+  "page_url": "file:///D:/A SLIIT/A Years/Y4S1/RP/Project/Ominifix-AI_Enhanced_Self_Healing_RPA_Framework/ai_locator_engine/demo_pages/login_v2_changed.html",
+  "failure_type": "ElementNotFound",
+  "failed_action": "click",
+  "element_role": "primary_action",
+  "expected_text": "Login",
+  "html_snapshot_path": "data\\html\\login_v2_snapshot.html",
+  "screenshot_path": "data\\screenshots\\login_v2.png",
+  "metadata": {
+    "bot_id": "RPA-0012",
+    "workflow_step": "login_submit"
+  }
+}
