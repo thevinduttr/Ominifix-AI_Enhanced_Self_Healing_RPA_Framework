@@ -3,7 +3,6 @@ import time
 import random
 import os
 
-# Allow monitor URL to be set via env var for local testing
 MONITOR_URL = os.environ.get('MONITOR_URL', 'http://localhost:8000/heartbeat')
 bot_id = os.environ.get('BOT_ID', 'BOT-' + str(random.randint(100, 999)))
 

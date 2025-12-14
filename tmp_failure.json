@@ -1,0 +1,1 @@
+{"botId":"TEST-BOT-01","error":"[TEST] OCR failure: sample text","dom":"<html><body>sample</body></html>","last_action":"Click","failure_type":"OCRFailure","strategy":"RunOCREngine","priority":"High"}
