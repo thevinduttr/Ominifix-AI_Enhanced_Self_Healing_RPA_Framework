@@ -9,10 +9,8 @@ def run():
 
         page.goto("https://www.google.com")
 
-        time.sleep(2)
-
         # Search box (this is the locator we will break later)
-        page.fill("textarea[name='q']", "OpenAI")
+        page.fill("textarea[name='qqq']", "OpenAI")
 
         page.keyboard.press("Enter")
         page.wait_for_timeout(2000)
