@@ -14,6 +14,7 @@ import logging
 
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse
+from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.locator_engine import ElementLocatorEngine
 from app.core.models.contracts import FailureFromOrchestrator, LocatorEngineReport
@@ -31,6 +32,15 @@ app = FastAPI(
         "Microservice responsible for analysing RPA element failures and "
         "producing robust replacement locators using multi-strategy analysis."
     ),
+)
+
+# --- CORS CONFIGURATION FOR REACT DASHBOARD ---
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 # Single engine instance reused for all requests
