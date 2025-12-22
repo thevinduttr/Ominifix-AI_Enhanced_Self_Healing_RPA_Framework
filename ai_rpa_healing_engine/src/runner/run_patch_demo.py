@@ -5,9 +5,11 @@ from src.locator_gen.locator_generator import LocatorGenerator
 from src.patcher.libcst_patcher import ScriptPatcher
 from src.engine.healing_validator import HealingValidator
 
-
+from src.ml.dataset_logger import DatasetLogger
 
 def main():
+    dataset_logger = DatasetLogger()
+
     input_path = "data/synthetic_inputs/elr_input_search_01.json"
     inp = json.loads(Path(input_path).read_text(encoding="utf-8"))
 
@@ -57,6 +59,17 @@ def main():
     # 3) Validate healed script
     validation = HealingValidator.validate_script(result.healed_script_path)
     print("[VALIDATION]", validation)
+
+    dataset_logger.log(
+        bot_id=bot_id,
+        error_type=inp["failure_context"]["error_type"],
+        old_locator=old_locator,
+        new_locator=new_locator_raw,
+        strategy="LOCATOR_REGEN_LIBCST",
+        confidence=best.get("score", 0) / 100.0,
+        outcome="SUCCESS",
+        element_html=element_html,
+    )
 
     if not validation["valid"]:
         raise RuntimeError(f"Healed script invalid: {validation['reason']}")
