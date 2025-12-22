@@ -1,0 +1,17 @@
+{
+  "version": "v1",
+  "labels": [
+    "LOCATOR_REGEN_LIBCST",
+    "WAIT_RETRY",
+    "FALLBACK_LOCATOR",
+    "TEMPLATE_REPAIR",
+    "NO_FIX"
+  ],
+  "description": {
+    "LOCATOR_REGEN_LIBCST": "Generate a new locator from DOM snippet and patch script preserving format using LibCST.",
+    "WAIT_RETRY": "Add wait/retry logic when element appears late.",
+    "FALLBACK_LOCATOR": "Switch to an alternate selector strategy (e.g., aria-label, placeholder).",
+    "TEMPLATE_REPAIR": "Apply a repair template for common RPA patterns.",
+    "NO_FIX": "Insufficient data or unsafe patch; no healing performed."
+  }
+}
