@@ -1,0 +1,23 @@
+{
+  "metadata": {
+    "healing_id": "HEAL-LOCAL-001",
+    "bot_id": "BOT-SEARCH-01",
+    "source_component": "code_healing_engine",
+    "target_component": "predictive_testing_engine"
+  },
+  "healing_summary": {
+    "status": "SUCCESS",
+    "strategy_used": "LOCATOR_REGEN_LIBCST",
+    "old_locator": "textarea[name='qqq']",
+    "new_locator": "textarea[name=\"q\"]",
+    "confidence": 0.8,
+    "validation": {
+      "valid": true,
+      "reason": "OK"
+    }
+  },
+  "script_output": {
+    "original_script_path": "data/scripts/broken/search_flow.py",
+    "healed_script_path": "data\\scripts\\healed\\BOT-SEARCH-01_search_flow_healed.py"
+  }
+}

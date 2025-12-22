@@ -3,81 +3,88 @@ from bs4 import BeautifulSoup
 
 class LocatorGenerator:
     """
-    Generates locator candidates from a single HTML element snippet.
-    v1 Strategy (deterministic):
-      - Prefer id-based CSS (#id)
-      - Then tag#id
-      - Then unique-ish attribute selectors (name, aria-label, placeholder, type)
-      - Then class-based selector (tag.class1.class2) as fallback
-      - Also generate a basic XPath as last resort
+    Generates RAW locator candidates from a single HTML element snippet.
+    IMPORTANT:
+      - Candidates returned here MUST be RAW selectors (NO wrapping quotes).
+      - Quoting for Python code is handled later by the patcher.
     """
 
-    IMPORTANT_ATTRS = ["id", "name", "aria-label", "placeholder", "type", "role"]
+    IMPORTANT_ATTRS = ["id", "name", "aria-label", "placeholder", "type", "role", "title"]
 
-    def generate_candidates(self, element_html: str) -> list[dict]:
+    def generate_candidates(self, element_html: str):
         if not element_html or not element_html.strip():
             return []
 
+        # Parse fragment safely (avoid lxml wrapping into <html>)
         soup = BeautifulSoup(element_html, "html.parser")
         el = soup.find(True)  # first real tag
-        if el is None or el.name is None:
+        if not el or not el.name:
             return []
 
         tag = el.name
-        attrs = {k: (v if isinstance(v, str) else " ".join(v)) for k, v in el.attrs.items()}
+        attrs = {}
+        for k, v in el.attrs.items():
+            if isinstance(v, list):
+                attrs[k] = " ".join(v)
+            else:
+                attrs[k] = str(v)
 
         candidates = []
 
-        # 1) id-based (best)
+        # 1) id-based
         el_id = attrs.get("id")
         if el_id:
             candidates.append({"type": "css", "value": f"#{el_id}", "score": 100})
             candidates.append({"type": "css", "value": f"{tag}#{el_id}", "score": 95})
 
-        # 2) attribute-based CSS
+        # 2) attribute-based css
         for a in self.IMPORTANT_ATTRS:
             val = attrs.get(a)
             if val and a != "id":
-                # Escape double quotes for safe selector strings
-                safe = str(val).replace('"', '\\"')
-                candidates.append({"type": "css", "value": f"{tag}[{a}=\"{safe}\"]", "score": 80})
-                candidates.append({"type": "css", "value": f"[{a}=\"{safe}\"]", "score": 75})
+                # Keep RAW selector (double-quotes inside selector are fine; patcher will wrap safely in single quotes)
+                candidates.append({"type": "css", "value": f'{tag}[{a}="{val}"]', "score": 80})
+                candidates.append({"type": "css", "value": f'[{a}="{val}"]', "score": 75})
 
-        # 3) class-based fallback
+        # 3) class fallback
         cls = attrs.get("class")
         if cls:
-            cls_list = cls.split() if isinstance(cls, str) else cls
-            # Keep it short: first 2 classes
+            cls_list = cls.split()
             cls_list = [c for c in cls_list if c][:2]
             if cls_list:
                 candidates.append({"type": "css", "value": tag + "".join([f".{c}" for c in cls_list]), "score": 60})
 
-        # 4) XPath fallback
+        # 4) xpath fallback
         xpath = self._build_basic_xpath(tag, attrs)
-        if xpath:
-            candidates.append({"type": "xpath", "value": xpath, "score": 40})
+        candidates.append({"type": "xpath", "value": xpath, "score": 40})
 
-        # Sort by score (desc) and deduplicate by (type,value)
+        # Dedup and ensure RAW (strip outer quotes if someone supplied them)
         seen = set()
         out = []
         for c in sorted(candidates, key=lambda x: x["score"], reverse=True):
-            key = (c["type"], c["value"])
-            if key not in seen:
-                seen.add(key)
-                out.append(c)
+            v = c["value"].strip()
+
+            # Remove outer quotes if present (RAW invariant)
+            if (v.startswith("'") and v.endswith("'")) or (v.startswith('"') and v.endswith('"')):
+                v = v[1:-1].strip()
+
+            key = (c["type"], v)
+            if key in seen:
+                continue
+            seen.add(key)
+            out.append({"type": c["type"], "value": v, "score": c["score"]})
 
         return out
 
-    def pick_best(self, candidates: list[dict]) -> dict | None:
+    def pick_best(self, candidates):
         if not candidates:
             return None
         return sorted(candidates, key=lambda x: x["score"], reverse=True)[0]
 
-    def _build_basic_xpath(self, tag: str, attrs: dict) -> str | None:
-        # Prefer id/name/placeholder in XPath
-        for k in ["id", "name", "aria-label", "placeholder"]:
+    def _build_basic_xpath(self, tag: str, attrs: dict) -> str:
+        for k in ["id", "name", "aria-label", "placeholder", "title"]:
             v = attrs.get(k)
             if v:
-                safe = str(v).replace("'", "\\'")
+                # XPath single-quoted value (escape single quotes if needed)
+                safe = v.replace("'", "\\'")
                 return f"//{tag}[@{k}='{safe}']"
         return f"//{tag}"
