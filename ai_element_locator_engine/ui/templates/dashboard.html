@@ -1,0 +1,119 @@
+{% extends "base.html" %}
+{% block content %}
+
+<div class="hero">
+  <div>
+    <h1>Run a Locator Resolution Demo</h1>
+    <p>
+      This UI simulates how the Orchestrator sends a failure context. The Locator Engine analyzes the DOM,
+      ranks candidates using the trained model, and returns a stable XPath/full XPath + element HTML.
+    </p>
+    <div style="margin-top:12px;">
+      <span class="badge"><span class="dot"></span> DOM+ML resolution + report generation</span>
+    </div>
+  </div>
+
+  <div class="kpi" style="min-width:320px;">
+    <div class="box">
+      <div class="t">Latest Report</div>
+      <div class="v">{{ "Available" if report else "None" }}</div>
+    </div>
+    <div class="box">
+      <div class="t">Output Format</div>
+      <div class="v">Integration JSON</div>
+    </div>
+  </div>
+</div>
+
+<div class="grid">
+  <div class="card">
+    <h2>Failure Context (Orchestrator → Locator Engine)</h2>
+    <form method="post" action="{{ url_for('run_demo') }}" onsubmit="setLoading('runBtn', true)">
+      <div class="row">
+        <div>
+          <label>Page URL</label>
+          <input name="page_url" placeholder="https://the-internet.herokuapp.com/login"
+                 value="https://the-internet.herokuapp.com/login" required />
+        </div>
+        <div>
+          <label>Failure Type</label>
+          <input name="failure_type" placeholder="ElementNotFound" value="ElementNotFound" />
+        </div>
+      </div>
+
+      <div class="row" style="margin-top:10px;">
+        <div>
+          <label>Action</label>
+          <select name="failed_action">
+            <option value="click" selected>click</option>
+            <option value="fill">fill</option>
+            <option value="select">select</option>
+            <option value="check">check</option>
+          </select>
+        </div>
+        <div>
+          <label>Expected Role</label>
+          <select name="element_role">
+            <option value="primary_action" selected>primary_action</option>
+            <option value="input_field">input_field</option>
+            <option value="search_box">search_box</option>
+            <option value="dropdown">dropdown</option>
+            <option value="checkbox">checkbox</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="row" style="margin-top:10px;">
+        <div>
+          <label>Expected Text</label>
+          <input name="expected_text" placeholder="Login" value="Login" />
+        </div>
+        <div>
+          <label>Old Locator (optional)</label>
+          <input name="old_locator" placeholder="css/xpath that failed e.g. button#login" />
+        </div>
+      </div>
+
+      <div class="row" style="margin-top:10px;">
+        <div>
+          <label>Bot ID</label>
+          <input name="bot_id" value="RPA-0012" />
+        </div>
+        <div>
+          <label>Workflow Step</label>
+          <input name="workflow_step" value="login_submit" />
+        </div>
+      </div>
+
+      <div style="margin-top:14px; display:flex; gap:10px;">
+        <button class="btn" id="runBtn" data-label="Run Demo (Generate Report)">Run Demo (Generate Report)</button>
+        <a class="btn secondary" href="{{ url_for('view_report') }}">View Latest Report</a>
+      </div>
+    </form>
+
+    <div class="small" style="margin-top:12px;">
+      Note: This does not “heal code”. It only finds the most reliable target element and returns stable selectors for the healing engine.
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Latest Report Snapshot</h2>
+    {% if report %}
+      <div class="small">Confidence</div>
+      <div style="font-size:22px; font-weight:900; margin:6px 0 12px 0;">
+        {{ "%.4f"|format(report.resolution.confidence) if report.resolution and report.resolution.confidence is not none else "—" }}
+      </div>
+
+      <div class="small">Resolved XPath</div>
+      <pre>{{ report.dom_context.recommended_locator.full_xpath if report.dom_context and report.dom_context.recommended_locator else "" }}</pre>
+
+      <div style="margin-top:10px;">
+        <a class="btn secondary" href="{{ url_for('view_report') }}">Open Full Report</a>
+      </div>
+    {% else %}
+      <div class="small">No report yet. Run a demo to generate one.</div>
+    {% endif %}
+  </div>
+</div>
+
+{% endblock %}

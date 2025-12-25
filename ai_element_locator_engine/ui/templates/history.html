@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% block content %}
+
+<div class="hero">
+  <div>
+    <h1>Report History</h1>
+    <p>Shows previous reports saved in <code>data/logs/</code>.</p>
+  </div>
+</div>
+
+<div class="card" style="margin-top:16px;">
+  <h2>Recent Reports</h2>
+  {% if reports and reports|length > 0 %}
+    <table class="table">
+      <tr>
+        <th>Timestamp</th>
+        <th>Run ID</th>
+        <th>Page</th>
+        <th>Confidence</th>
+      </tr>
+      {% for r in reports %}
+      <tr>
+        <td>{{ r.metadata.timestamp }}</td>
+        <td>{{ r.metadata.run_id }}</td>
+        <td>{{ r.failure_context.page_url }}</td>
+        <td>{{ "%.4f"|format(r.resolution.confidence) }}</td>
+      </tr>
+      {% endfor %}
+    </table>
+  {% else %}
+    <div class="small">No history yet. Run a few demos.</div>
+  {% endif %}
+</div>
+
+{% endblock %}

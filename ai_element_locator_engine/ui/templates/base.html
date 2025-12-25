@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>{{ title or "AI Element Locator Engine" }}</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+  <div class="container">
+    <div class="nav">
+      <div class="brand">
+        <div class="logo"></div>
+        <div>
+          AI Element Locator Engine
+        </div>
+      </div>
+      <div>
+        <a href="{{ url_for('dashboard') }}">Dashboard</a>
+        <a href="{{ url_for('view_report') }}">Latest Report</a>
+        <a href="{{ url_for('history') }}">History</a>
+      </div>
+    </div>
+
+    {% block content %}{% endblock %}
+
+    <div class="footer">
+      “Simulate Failure” → “Locator Engine resolves” → “Report sent to Code Healing Engine”.
+    </div>
+  </div>
+
+  <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+</body>
+</html>
