@@ -1,0 +1,10 @@
+{
+  "page_url": "https://example.com",
+  "failure_type": "ElementNotFound",
+  "failed_action": "click",
+  "element_role": "primary_action",
+  "expected_text": "Login",
+  "old_locator": "//button[@id='login_old']",
+  "old_locator_type": "xpath",
+  "error_message": "Message: no such element: Unable to locate element: {\"method\":\"xpath\",\"selector\":\"//button[@id='login_old']\"}\n  (Session info: chrome=143.0.7499.147); For documentation on this error, please visit: https://www.selenium.dev/documentation/webdriver/troubleshooting/errors#nosuchelementexception\nStacktrace:\nSymbols not available. Dumping unresolved backtrace:\n\t0x7ff708f188e5\n\t0x7ff708f18940\n\t0x7ff708cf165d\n\t0x7ff708d49a33\n\t0x7ff708d49d3c\n\t0x7ff708d9df67\n\t0x7ff708d9ac97\n\t0x7ff708d3ac29\n\t0x7ff708d3ba93\n\t0x7ff709230640\n\t0x7ff70922af80\n\t0x7ff7092496e6\n\t0x7ff708f35de4\n\t0x7ff708f3ed8c\n\t0x7ff708f22004\n\t0x7ff708f221b5\n\t0x7ff708f07ee2\n\t0x7ff9ff20e8d7\n\t0x7ffa00e0c53c\n"
+}
