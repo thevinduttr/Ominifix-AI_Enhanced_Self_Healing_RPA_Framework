@@ -1,8 +1,0 @@
-{
-  "page_url": "file:///D:/A SLIIT/A Years/Y4S1/RP/Project/Ominifix-AI_Enhanced_Self_Healing_RPA_Framework/ai_locator_engine/api/demo_pages/login_v2_changed.html",
-  "element_role": "primary_action",
-  "expected_text": "Login",
-  "best_locator": null,
-  "candidates": [],
-  "analysis_notes": "DOM + CV + ML ranking executed."
-}
