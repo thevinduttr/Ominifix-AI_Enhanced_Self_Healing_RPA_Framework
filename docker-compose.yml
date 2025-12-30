@@ -55,7 +55,7 @@ services:
       context: .
       dockerfile: orchestrator-coordinator/Dockerfile
     container_name: ominifix_coordinator
-    command: ["python","consumer.py"]
+    command: ["python","orchestrator-coordinator/consumer.py"]
     environment:
       RABBIT_HOST: rabbitmq
     depends_on:
