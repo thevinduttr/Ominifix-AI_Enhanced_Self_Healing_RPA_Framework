@@ -26,9 +26,16 @@ function renderFailures(failures){
   const el = document.getElementById('recent-failures');
   if(!el) return;
   if(!failures || failures.length === 0){ el.innerHTML = '<div class="muted">No failures yet</div>'; return; }
-  const items = failures.slice(0,10).map((f, idx) => {
+    const items = failures.slice(0,10).map((f, idx) => {
     const t = new Date((f.timestamp||0)*1000);
     const err = f.error ? `<div style="margin-top:8px;color:#ffdede;font-size:0.9rem">${escapeHtml((f.error||'')).slice(0,240)}</div>` : '';
+    // build category badge with confidence and emphasis
+    let categoryBadge = '';
+    if(f.category){
+      const conf = (typeof f.confidence === 'number') ? ` ${Math.round(f.confidence*100)}%` : '';
+      const cls = (f.category === 'unknown') ? 'category-badge unknown' : ((f.confidence && f.confidence >= 0.7) ? 'category-badge confident' : 'category-badge');
+      categoryBadge = `<div style="margin-left:8px;display:inline-block"><span class="${cls}">${escapeHtml(f.category)}${conf}</span></div>`;
+    }
     const meta = [];
     if(f.failure_type) meta.push(`<strong>Type:</strong> ${escapeHtml(f.failure_type)}`);
     if(f.last_action) meta.push(`<strong>Action:</strong> ${escapeHtml(f.last_action)}`);
@@ -40,6 +47,7 @@ function renderFailures(failures){
       <div class="failure-card" data-idx="${idx}" style="margin-bottom:10px;padding:10px;border-radius:8px;background:rgba(255,255,255,0.02);cursor:pointer">
         <div style="display:flex;justify-content:space-between;align-items:center">
           <div><strong>${escapeHtml(f.botId || '')}</strong><div class="muted" style="margin-top:4px">${t.toLocaleString()}</div></div>
+          <div>${categoryBadge}</div>
         </div>
         ${err}
         <div style="margin-top:8px;color:var(--muted);font-size:0.85rem">${meta.join(' • ')}</div>
@@ -83,16 +91,22 @@ function showFailureJson(failure){
   }
   // populate structured fields
   const fieldsEl = document.getElementById('failure-fields');
-  if(fieldsEl){
-    const parts = [];
-    if(failure.failure_type) parts.push(['Type', failure.failure_type]);
-    if(failure.last_action) parts.push(['Last action', failure.last_action]);
-    if(failure.strategy) parts.push(['Strategy', failure.strategy]);
-    if(failure.priority) parts.push(['Priority', failure.priority]);
-    parts.push(['Bot ID', failure.botId || '']);
-    parts.push(['Timestamp', failure.timestamp ? new Date(failure.timestamp*1000).toLocaleString() : '']);
-    fieldsEl.innerHTML = parts.map(p => `<div style="min-width:160px;padding:8px;border-radius:8px;background:rgba(255,255,255,0.02)"><div style="font-size:12px;color:var(--muted)">${escapeHtml(p[0])}</div><div style="font-weight:700;margin-top:6px">${escapeHtml(String(p[1]||''))}</div></div>`).join('');
-  }
+    if(fieldsEl){
+      const parts = [];
+      if(failure.failure_type) parts.push(['Type', failure.failure_type]);
+      if(failure.last_action) parts.push(['Last action', failure.last_action]);
+      if(failure.strategy) parts.push(['Strategy', failure.strategy]);
+      if(failure.priority) parts.push(['Priority', failure.priority]);
+      if(failure.category) parts.push(['Category', failure.category + (failure.confidence ? ` (${Math.round(failure.confidence*100)}%)` : '')]);
+      parts.push(['Bot ID', failure.botId || '']);
+      parts.push(['Timestamp', failure.timestamp ? new Date(failure.timestamp*1000).toLocaleString() : '']);
+      fieldsEl.innerHTML = parts.map(p => {
+        const key = escapeHtml(p[0]);
+        const val = escapeHtml(String(p[1]||''));
+        const valHtml = (p[0] === 'Category') ? `<span class="category-badge" style="font-size:0.95rem">${val}</span>` : val;
+        return `<div style="min-width:160px;padding:8px;border-radius:8px;background:rgba(255,255,255,0.02)"><div style="font-size:12px;color:var(--muted)">${key}</div><div style="font-weight:700;margin-top:6px">${valHtml}</div></div>`;
+      }).join('');
+    }
 
   // prepare DOM render button
   const domContainer = document.getElementById('failure-dom-container');
