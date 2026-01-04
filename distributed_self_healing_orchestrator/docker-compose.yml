@@ -1,0 +1,99 @@
+version: '3.8'
+
+services:
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: ominifix_rabbitmq
+    ports:
+      - "5672:5672"    # AMQP
+      - "15672:15672"  # Management UI
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+
+  model_server:
+    build:
+      context: .
+      dockerfile: orchestrator-monitor/Dockerfile
+    container_name: ominifix_model_server
+    command: ["uvicorn","model_server:app","--host","0.0.0.0","--port","8002"]
+    ports:
+      - "8002:8002"
+    depends_on:
+      - rabbitmq
+
+  orchestrator_monitor:
+    build:
+      context: .
+      dockerfile: orchestrator-monitor/Dockerfile
+    container_name: ominifix_monitor
+    command: ["uvicorn","app:app","--host","0.0.0.0","--port","8000"]
+    ports:
+      - "8000:8000"
+    environment:
+      MODEL_URL: http://model_server:8002/classify
+      RABBIT_HOST: rabbitmq
+    depends_on:
+      - rabbitmq
+      - model_server
+
+  ai_healing_engine:
+    build:
+      context: .
+      dockerfile: orchestrator-coordinator/Dockerfile
+    container_name: ominifix_ai_healer
+    command: ["uvicorn","mock_ai:app","--host","0.0.0.0","--port","5001"]
+    ports:
+      - "5001:5001"
+    depends_on:
+      - rabbitmq
+
+  orchestrator_coordinator:
+    build:
+      context: .
+      dockerfile: orchestrator-coordinator/Dockerfile
+    container_name: ominifix_coordinator
+    command: ["python","orchestrator-coordinator/consumer.py"]
+    environment:
+      RABBIT_HOST: rabbitmq
+    depends_on:
+      - rabbitmq
+
+  ai_element_locator:
+    build:
+      context: ..
+      dockerfile: ai_element_locator_engine/Dockerfile
+    container_name: ominifix_locator
+    ports:
+      - "8001:8001"
+    depends_on:
+      - rabbitmq
+
+  bot_normal:
+    build:
+      context: .
+      dockerfile: dummy_bot/Dockerfile
+    container_name: ominifix_bot_normal
+    command: ["python","bot.py"]
+    environment:
+      - MONITOR_URL=http://orchestrator_monitor:8000/heartbeat
+    depends_on:
+      - orchestrator_monitor
+
+  bot_fail:
+    build:
+      context: .
+      dockerfile: dummy_bot/Dockerfile
+    container_name: ominifix_bot_fail
+    command: ["python","bot_fail.py"]
+    environment:
+      - MONITOR_URL=http://orchestrator_monitor:8000/heartbeat
+    depends_on:
+      - orchestrator_monitor
+
+volumes:
+  rabbitmq_data:
+    name: ominifix_rabbitmq_data
+ 
