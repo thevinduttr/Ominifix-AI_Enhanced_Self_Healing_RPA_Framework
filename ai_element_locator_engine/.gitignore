@@ -1,0 +1,12 @@
+venv/
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.pkl
+*.sqlite
+*.db
+.env
+logs/
+*.log
+node_modules
