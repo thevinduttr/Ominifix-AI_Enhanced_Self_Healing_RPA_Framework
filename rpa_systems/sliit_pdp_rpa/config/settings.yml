@@ -1,0 +1,6 @@
+headless: false
+timeout_ms: 30000
+slow_mo_ms: 100
+output_excel: "outputs/sliit_professional_programmes.xlsx"
+base_url: "https://www.sliit.lk/"
+target_url: "https://www.sliit.lk/professional-programmes/"
