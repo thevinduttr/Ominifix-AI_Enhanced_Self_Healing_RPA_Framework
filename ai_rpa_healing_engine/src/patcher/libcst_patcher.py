@@ -2,114 +2,212 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Set, List, Tuple
 
+import ast
+import re
 import libcst as cst
-import libcst.matchers as m
-from libcst.metadata import MetadataWrapper, PositionProvider
+import libcst.metadata as meta
 
 
 @dataclass
 class PatchResult:
-    status: str  # "SUCCESS" / "FAILED"
+    status: str  # "SUCCESS" | "FAILED"
     message: str
-    old_locator: Optional[str]
-    new_locator: Optional[str]
-    healed_script_path: Optional[str]
+    old_locator: Optional[str] = None
+    new_locator: Optional[str] = None
+    healed_script_path: Optional[str] = None
 
 
-class _LocatorArgReplacer(cst.CSTTransformer):
-    METADATA_DEPENDENCIES = (PositionProvider,)
+_ALLOWED_METHODS: Set[str] = {
+    "click",
+    "fill",
+    "wait_for_selector",
+    "query_selector_all",
+    "locator",
+}
 
-    def __init__(self, failing_line: int, old_locator: str, new_locator: str, methods: set[str]):
+
+def _get_call_method_name(call: cst.Call) -> Optional[str]:
+    if isinstance(call.func, cst.Attribute):
+        return call.func.attr.value
+    return None
+
+
+def _literal_string_value(node: cst.CSTNode) -> Optional[str]:
+    if isinstance(node, cst.SimpleString):
+        try:
+            return cst.literal_eval(node.value)
+        except Exception:
+            return None
+    return None
+
+
+def _make_string_literal(s: str) -> cst.SimpleString:
+    esc = s.replace("\\", "\\\\").replace('"', '\\"')
+    return cst.SimpleString(f"\"{esc}\"")
+
+
+class _CollectCandidatesVisitor(cst.CSTVisitor):
+    METADATA_DEPENDENCIES = (meta.PositionProvider,)
+
+    def __init__(self, failing_line: int, action: str):
         self.failing_line = failing_line
-        self.old_locator = old_locator
-        self.new_locator = new_locator
-        self.methods = methods
+        self.action = action
+        self.candidates: List[Tuple[cst.Call, str]] = []  # (call_node, old_value)
 
-        self.replaced = False
-        self.replaced_at_line = False
+    def visit_Call(self, node: cst.Call) -> Optional[bool]:
+        method = _get_call_method_name(node)
+        if method != self.action:
+            return None
+
+        pos = self.get_metadata(meta.PositionProvider, node, None)
+        if pos is None:
+            return None
+
+        if not (pos.start.line <= self.failing_line <= pos.end.line):
+            return None
+
+        if not node.args:
+            return None
+
+        old_val = _literal_string_value(node.args[0].value)
+        if old_val is None:
+            return None
+
+        self.candidates.append((node, old_val))
+        return None
+
+
+class _PatchSpecificCallTransformer(cst.CSTTransformer):
+    def __init__(self, target_call: cst.Call, new_locator: str):
+        self.target_call = target_call
+        self.new_locator = new_locator
+        self.did_patch = False
+        self.found_old: Optional[str] = None
 
     def leave_Call(self, original_node: cst.Call, updated_node: cst.Call) -> cst.Call:
-        # Only patch once
-        if self.replaced:
+        if self.did_patch:
             return updated_node
 
-        # Match: <anything>.<method>(...)
-        if not m.matches(
-            updated_node.func,
-            m.Attribute(
-                attr=m.Name(),
-            ),
-        ):
+        if original_node is not self.target_call:
             return updated_node
 
-        func_attr: cst.Attribute = updated_node.func  # type: ignore
-        method_name = func_attr.attr.value
-        if method_name not in self.methods:
-            return updated_node
-
-        # Must have at least 1 arg
         if not updated_node.args:
             return updated_node
 
-        # We patch only the FIRST argument if it's a string literal
-        first_arg = updated_node.args[0].value
-
-        # Check position line
-        pos = self.get_metadata(PositionProvider, original_node, None)
-        node_line = pos.start.line if pos else None
-
-        # Target only failing line first
-        if node_line != self.failing_line:
+        old_val = _literal_string_value(updated_node.args[0].value)
+        if old_val is None:
             return updated_node
 
-        # Accept either '...' or "..." in source; we compare evaluated content carefully
-        if isinstance(first_arg, cst.SimpleString):
-            raw = first_arg.value  # includes quotes
-            # Normalize content without quotes (best-effort)
-            content = raw[1:-1] if len(raw) >= 2 else raw
+        new_first = _make_string_literal(self.new_locator)
+        new_args = list(updated_node.args)
+        new_args[0] = new_args[0].with_changes(value=new_first)
 
-            # We accept match if content equals old_locator OR raw equals old_locator
-            if content == self.old_locator or raw == self.old_locator:
-                new_string_node = cst.SimpleString(repr(self.new_locator))
-                new_args = list(updated_node.args)
-                new_args[0] = updated_node.args[0].with_changes(value=new_string_node)
-                self.replaced = True
-                self.replaced_at_line = True
-                return updated_node.with_changes(args=new_args)
-
-        return updated_node
+        self.did_patch = True
+        self.found_old = old_val
+        return updated_node.with_changes(args=new_args)
 
 
-class _GlobalLocatorStringReplacer(cst.CSTTransformer):
-    """
-    Fallback: replace exact string literal content anywhere in file.
-    Preserves formatting; only changes the string literal value.
-    """
-    def __init__(self, old_locator: str, new_locator: str):
+class _ExactMatchPatchTransformer(cst.CSTTransformer):
+    def __init__(self, action: str, old_locator: str, new_locator: str):
+        self.action = action
         self.old_locator = old_locator
         self.new_locator = new_locator
-        self.replaced = False
+        self.did_patch = False
 
-    def leave_SimpleString(self, original_node: cst.SimpleString, updated_node: cst.SimpleString) -> cst.SimpleString:
-        if self.replaced:
+    def leave_Call(self, original_node: cst.Call, updated_node: cst.Call) -> cst.Call:
+        if self.did_patch:
             return updated_node
 
-        raw = original_node.value
-        content = raw[1:-1] if len(raw) >= 2 else raw
+        method = _get_call_method_name(original_node)
+        if method != self.action:
+            return updated_node
 
-        if content == self.old_locator or raw == self.old_locator:
-            self.replaced = True
-            return cst.SimpleString(repr(self.new_locator))
-        return updated_node
+        if not updated_node.args:
+            return updated_node
+
+        old_val = _literal_string_value(updated_node.args[0].value)
+        if old_val is None or old_val != self.old_locator:
+            return updated_node
+
+        new_first = _make_string_literal(self.new_locator)
+        new_args = list(updated_node.args)
+        new_args[0] = new_args[0].with_changes(value=new_first)
+
+        self.did_patch = True
+        return updated_node.with_changes(args=new_args)
 
 
 class ScriptPatcher:
-    """
-    LibCST-based patcher that preserves formatting (blank lines, comments).
-    Supports patching locator string in page.fill / page.click.
-    """
+    @staticmethod
+    def _similarity(a: str, b: str) -> int:
+        if not a or not b:
+            return 0
+        aset, bset = set(a), set(b)
+        return len(aset.intersection(bset))
+
+    @staticmethod
+    def _line_fallback_patch(code: str, failing_line: int, action: str, new_locator: str) -> tuple[bool, Optional[str], str]:
+        """
+        Safe last-resort patch:
+        - Only touches the single failing line.
+        - Finds ".<action>(" on that line.
+        - Replaces the FIRST string literal argument inside that call.
+        Returns: (patched, found_old, new_code)
+        """
+        lines = code.splitlines(keepends=True)
+        idx = failing_line - 1
+        if idx < 0 or idx >= len(lines):
+            return False, None, code
+
+        line = lines[idx]
+
+        # Must contain .action(
+        marker = f".{action}("
+        pos = line.find(marker)
+        if pos == -1:
+            return False, None, code
+
+        # From after ".action(", find first quote
+        start = pos + len(marker)
+        m = re.search(r"""(['"])""", line[start:])
+        if not m:
+            return False, None, code
+
+        q = m.group(1)
+        qpos = start + m.start()
+
+        # Find matching closing quote (simple, safe)
+        # This assumes selector is a normal quoted string on the same line (true for your RPA file).
+        end = qpos + 1
+        escaped = False
+        while end < len(line):
+            ch = line[end]
+            if escaped:
+                escaped = False
+            elif ch == "\\":
+                escaped = True
+            elif ch == q:
+                break
+            end += 1
+
+        if end >= len(line) or line[end] != q:
+            return False, None, code
+
+        literal = line[qpos:end + 1]  # includes quotes
+
+        # Parse the literal to get old value safely
+        try:
+            found_old = ast.literal_eval(literal)
+        except Exception:
+            return False, None, code
+
+        # Replace with a double-quoted literal
+        new_lit = '"' + new_locator.replace("\\", "\\\\").replace('"', '\\"') + '"'
+        new_line = line[:qpos] + new_lit + line[end + 1:]
+        lines[idx] = new_line
+        return True, str(found_old), "".join(lines)
 
     def patch_locator(
         self,
@@ -118,80 +216,101 @@ class ScriptPatcher:
         failing_line: int,
         old_locator: str,
         new_locator: str,
-        action: Optional[str] = None,  # "fill" / "click" / None => both
+        action: str,
     ) -> PatchResult:
-        in_path = Path(script_path)
-        if not in_path.exists():
+        action = (action or "").strip().lower()
+
+        if action not in _ALLOWED_METHODS:
             return PatchResult(
                 status="FAILED",
-                message=f"Script not found: {script_path}",
+                message=f"Unsupported action '{action}'. Allowed: {sorted(_ALLOWED_METHODS)}",
                 old_locator=old_locator,
                 new_locator=new_locator,
-                healed_script_path=None,
             )
 
+        src_path = Path(script_path)
+        if not src_path.exists():
+            return PatchResult(
+                status="FAILED",
+                message=f"Original script not found: {script_path}",
+                old_locator=old_locator,
+                new_locator=new_locator,
+            )
+
+        code = src_path.read_text(encoding="utf-8")
+
+        # ---- 1) LibCST failing_line candidates ----
         try:
-            source = in_path.read_text(encoding="utf-8")
-            module = cst.parse_module(source)
-            wrapper = MetadataWrapper(module)
+            module = cst.parse_module(code)
+            wrapper = cst.metadata.MetadataWrapper(module)
 
-            # Decide which methods to patch
-            if action == "fill":
-                methods = {"fill"}
-            elif action == "click":
-                methods = {"click"}
-            else:
-                methods = {"fill", "click"}
+            collector = _CollectCandidatesVisitor(int(failing_line), action)
+            wrapper.visit(collector)
 
-            # 1) Try patch at failing line for action(s)
-            tx = _LocatorArgReplacer(
-                failing_line=failing_line,
-                old_locator=old_locator,
-                new_locator=new_locator,
-                methods=methods,
-            )
-            updated = wrapper.visit(tx)
+            if collector.candidates:
+                if len(collector.candidates) == 1:
+                    target_call, found_old = collector.candidates[0]
+                else:
+                    scored = []
+                    for call_node, found in collector.candidates:
+                        scored.append((self._similarity(found, old_locator), call_node, found))
+                    scored.sort(key=lambda x: x[0], reverse=True)
+                    _, target_call, found_old = scored[0]
 
-            if not tx.replaced:
-                # 2) Fallback: global replace exact string literal
-                updated = module.visit(_GlobalLocatorStringReplacer(old_locator, new_locator))
+                patch_tx = _PatchSpecificCallTransformer(target_call, new_locator)
+                modified = wrapper.visit(patch_tx)
 
-                # check if it replaced
-                # (we cannot directly know; simplest: see if old locator still present as a quoted literal)
-                if old_locator not in updated.code and f'"{old_locator}"' not in updated.code and f"'{old_locator}'" not in updated.code:
-                    # Might still be okay if old_locator had different quote style; but generally:
-                    # If no literal match changed, treat as failure.
-                    pass
+                if patch_tx.did_patch:
+                    out_path = Path(output_path)
+                    out_path.parent.mkdir(parents=True, exist_ok=True)
+                    out_path.write_text(modified.code, encoding="utf-8")
+                    return PatchResult(
+                        status="SUCCESS",
+                        message="LibCST patch applied using failing_line candidate (format preserved).",
+                        old_locator=patch_tx.found_old or found_old or old_locator,
+                        new_locator=new_locator,
+                        healed_script_path=str(out_path),
+                    )
 
-            # Determine success heuristics:
-            # Success if new_locator appears in code AND old_locator literal is reduced.
-            # (best-effort; your earlier logic is fine)
-            if new_locator not in updated.code:
+            # ---- 2) LibCST exact match fallback ----
+            exact_tx = _ExactMatchPatchTransformer(action, old_locator, new_locator)
+            modified2 = module.visit(exact_tx)
+            if exact_tx.did_patch:
+                out_path = Path(output_path)
+                out_path.parent.mkdir(parents=True, exist_ok=True)
+                out_path.write_text(modified2.code, encoding="utf-8")
                 return PatchResult(
-                    status="FAILED",
-                    message="LibCST patch failed: target call not found at failing line; global search may have failed.",
+                    status="SUCCESS",
+                    message="LibCST patch applied using exact match (format preserved).",
                     old_locator=old_locator,
                     new_locator=new_locator,
-                    healed_script_path=None,
+                    healed_script_path=str(out_path),
                 )
 
+        except Exception:
+            # If LibCST parsing/metadata fails for any reason, we still attempt line fallback below
+            pass
+
+        # ---- 3) Safe single-line fallback (guaranteed for your locator case) ----
+        patched, found_old, new_code = self._line_fallback_patch(code, int(failing_line), action, new_locator)
+        if patched:
             out_path = Path(output_path)
             out_path.parent.mkdir(parents=True, exist_ok=True)
-            out_path.write_text(updated.code, encoding="utf-8")
-
+            out_path.write_text(new_code, encoding="utf-8")
             return PatchResult(
                 status="SUCCESS",
-                message="LibCST patch applied (format preserved).",
-                old_locator=old_locator,
+                message="Fallback line patch applied (single-line selector replaced).",
+                old_locator=found_old or old_locator,
                 new_locator=new_locator,
                 healed_script_path=str(out_path),
             )
 
-        except Exception as e:
-            return PatchResult(
-                status="FAILED",
-                message=f"LibCST patch exception: {e}",
-                old_locator=old_locator,
-                new_locator=new_locator,
-                healed_script_path=None,
-            )
+        return PatchResult(
+            status="FAILED",
+            message=(
+                f"Patch failed: No patchable '.{action}(\"...\")' call located using failing_line={failing_line}, "
+                f"no exact match for old_locator, and single-line fallback did not detect a selector string."
+            ),
+            old_locator=old_locator,
+            new_locator=new_locator,
+        )
