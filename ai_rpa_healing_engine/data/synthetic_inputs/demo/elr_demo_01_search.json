@@ -1,0 +1,27 @@
+{
+  "metadata": {
+    "report_id": "ELR-DEMO-001",
+    "run_id": "RUN-DEMO-UI-01",
+    "bot_id": "BOT-DEMO-SEARCH-01",
+    "timestamp": "2025-12-22T00:00:00",
+    "source_component": "element_locator_engine",
+    "target_component": "code_healing_engine"
+  },
+  "failure_context": {
+    "script_path": "data/scripts/broken/demo/demo_01_search_flow.py",
+    "failing_line": 11,
+    "action": "fill",
+    "old_locator": "textarea[name='qqq']",
+    "error_type": "ELEMENT_NOT_FOUND",
+    "error_message": "Timeout waiting for selector textarea[name='qqq']"
+  },
+  "dom_context": {
+    "page_url": "https://www.google.com",
+    "page_name": "Google Search",
+    "new_element_html": "<textarea class=\"gLFyf\" name=\"q\" aria-label=\"Search\" rows=\"1\"></textarea>"
+  },
+  "element_expectation": {
+    "expected_role": "search_box",
+    "expected_text": "Search"
+  }
+}
