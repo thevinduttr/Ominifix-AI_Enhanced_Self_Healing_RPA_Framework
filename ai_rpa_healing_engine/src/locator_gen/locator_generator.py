@@ -1,3 +1,5 @@
+from typing import Any, Dict, List, Optional
+
 from bs4 import BeautifulSoup
 
 
@@ -11,7 +13,7 @@ class LocatorGenerator:
 
     IMPORTANT_ATTRS = ["id", "name", "aria-label", "placeholder", "type", "role", "title"]
 
-    def generate_candidates(self, element_html: str):
+    def generate_candidates(self, element_html: str) -> List[Dict[str, Any]]:
         if not element_html or not element_html.strip():
             return []
 
@@ -75,7 +77,7 @@ class LocatorGenerator:
 
         return out
 
-    def pick_best(self, candidates):
+    def pick_best(self, candidates: List[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
         if not candidates:
             return None
         return sorted(candidates, key=lambda x: x["score"], reverse=True)[0]
