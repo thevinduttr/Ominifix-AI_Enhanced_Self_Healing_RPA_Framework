@@ -1,0 +1,27 @@
+{
+  "metadata": {
+    "report_id": "ELR-DEMO-002",
+    "run_id": "RUN-DEMO-UI-01",
+    "bot_id": "BOT-DEMO-LOGIN-USER-01",
+    "timestamp": "2025-12-22T00:00:00",
+    "source_component": "element_locator_engine",
+    "target_component": "code_healing_engine"
+  },
+  "failure_context": {
+    "script_path": "data/scripts/broken/demo/demo_02_login_username.py",
+    "failing_line": 12,
+    "action": "fill",
+    "old_locator": "input#username",
+    "error_type": "ELEMENT_NOT_FOUND",
+    "error_message": "Timeout waiting for selector input#username"
+  },
+  "dom_context": {
+    "page_url": "https://example.com/login",
+    "page_name": "Login Page",
+    "new_element_html": "<input type=\"text\" aria-label=\"Username\" autocomplete=\"username\" />"
+  },
+  "element_expectation": {
+    "expected_role": "input",
+    "expected_text": "Username"
+  }
+}

@@ -4,8 +4,82 @@ __pycache__/
 .venv/
 venv/
 .env
+# ===============================
+# Python
+# ===============================
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+
+# Virtual environment
+.venv/
+venv/
+env/
+
+# ===============================
+# Playwright
+# ===============================
+playwright/.cache/
+.playwright/
+test-results/
+playwright-report/
+
+# ===============================
+# ML Models & Large Files
+# ===============================
+models/*.pkl
+models/*.joblib
+models/*.h5
+models/*.onnx
+
+# ===============================
+# Data (Generated / Runtime)
+# ===============================
+data/logs/
+data/dom_snapshots/
+data/synthetic_outputs/
+data/scripts/healed/
+data/ml/
+*.csv
+*.parquet
+
+# ===============================
+# Notebooks
+# ===============================
+.ipynb_checkpoints/
+
+# ===============================
+# Git / OS
+# ===============================
 .DS_Store
 *.egg-info
 .pytest_cache/
 ENV/
 *.pyc
+Thumbs.db
+
+# ===============================
+# IDE / Editor
+# ===============================
+.vscode/
+.idea/
+*.iml
+
+# ===============================
+# Logs
+# ===============================
+*.log
+
+# ===============================
+# Temporary / Backup
+# ===============================
+*.tmp
+*.bak
+*.swp
+
+# ===============================
+# Kaggle
+# ===============================
+kaggle.json

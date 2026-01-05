@@ -1,0 +1,38 @@
+{
+  "metadata": {
+    "healing_id": "HEAL-UI-001",
+    "bot_id": "BOT-DEMO-SEARCH-01",
+    "source_component": "code_healing_engine",
+    "target_component": "predictive_testing_engine"
+  },
+  "healing_summary": {
+    "status": "SUCCESS",
+    "strategy_used": "LOCATOR_REGEN_LIBCST",
+    "action": "fill",
+    "old_locator": "textarea[name='qqq']",
+    "new_locator": "textarea[name=\"q\"]",
+    "confidence": 0.8,
+    "patcher": "LibCST (format preserved)",
+    "validation": {
+      "valid": true,
+      "reason": "OK"
+    }
+  },
+  "locator_candidate": {
+    "type": "css",
+    "score": 80
+  },
+  "script_output": {
+    "original_script_path": "data/scripts/broken/demo/demo_01_search_flow.py",
+    "healed_script_path": "data\\ui_outputs\\BOT-DEMO-SEARCH-01\\healed_script.py"
+  },
+  "model_info": {
+    "model_used": "strategy_selector_v1",
+    "model_source": "kaggle",
+    "predicted_strategy": "LOCATOR_REGEN_LIBCST",
+    "model_confidence": 0.6589698610999313
+  },
+  "runtime": {
+    "duration_ms": 19155
+  }
+}

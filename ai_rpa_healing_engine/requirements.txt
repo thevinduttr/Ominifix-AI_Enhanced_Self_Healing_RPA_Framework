@@ -1,0 +1,22 @@
+# ---------- Core Language ----------
+python-dateutil
+
+# ---------- HTML / DOM Processing ----------
+beautifulsoup4
+lxml
+
+# ---------- Code Transformation ----------
+libcst
+
+# ---------- RPA / Automation ----------
+playwright
+
+# ---------- Machine Learning (MATCH KAGGLE) ----------
+scikit-learn
+joblib
+numpy
+pandas
+
+# ---------- Utilities ----------
+tqdm
+streamlit

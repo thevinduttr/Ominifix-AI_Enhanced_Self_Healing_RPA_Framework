@@ -1,0 +1,14 @@
+nav:
+  professional_programmes_link: "a[href='https://www.sliit.lk/professional-programmes/']"
+
+tabs:
+  tab_list: "ul.nav.hr-tabs-nav[role='tablist']"
+  tab_items: "ul.nav.hr-tabs-nav[role='tablist'] li.hr-tabs-nav-item a[role='tab']"
+
+content:
+  tab_panel_root: "div.pdp-course-col"
+  program_link_selector: "div.zn-buttonWrapper a[itemprop='url']"
+  program_text_selector: "span.zn-buttonText"
+
+output_dir: "outputs"
+output_prefix: "sliit_professional_programmes-extraction"
