@@ -7,9 +7,5 @@ venv/
 .DS_Store
 *.egg-info
 .pytest_cache/
-.venv/
-venv/
-env/
 ENV/
-__pycache__/
 *.pyc
