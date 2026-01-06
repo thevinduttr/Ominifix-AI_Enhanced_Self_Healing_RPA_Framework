@@ -3,7 +3,6 @@ version: '3.8'
 services:
   rabbitmq:
     image: rabbitmq:3-management
-    container_name: ominifix_rabbitmq
     ports:
       - "5672:5672"    # AMQP
       - "15672:15672"  # Management UI
@@ -17,7 +16,6 @@ services:
     build:
       context: ./distributed_self_healing_orchestrator
       dockerfile: orchestrator-monitor/Dockerfile
-    container_name: ominifix_model_server
     command: ["uvicorn","model_server:app","--host","0.0.0.0","--port","8002"]
     ports:
       - "8002:8002"
@@ -28,7 +26,6 @@ services:
     build:
       context: ./distributed_self_healing_orchestrator
       dockerfile: orchestrator-monitor/Dockerfile
-    container_name: ominifix_monitor
     command: ["uvicorn","app:app","--host","0.0.0.0","--port","8000"]
     ports:
       - "8000:8000"
@@ -43,7 +40,6 @@ services:
     build:
       context: ./distributed_self_healing_orchestrator
       dockerfile: orchestrator-coordinator/Dockerfile
-    container_name: ominifix_ai_healer
     command: ["uvicorn","mock_ai:app","--host","0.0.0.0","--port","5001"]
     ports:
       - "5001:5001"
@@ -54,8 +50,7 @@ services:
     build:
       context: ./distributed_self_healing_orchestrator
       dockerfile: orchestrator-coordinator/Dockerfile
-    container_name: ominifix_coordinator
-    command: ["python","orchestrator-coordinator/consumer.py"]
+    command: ["python","consumer.py"]
     environment:
       RABBIT_HOST: rabbitmq
     depends_on:
@@ -65,7 +60,6 @@ services:
     build:
       context: .
       dockerfile: ai_element_locator_engine/Dockerfile
-    container_name: ominifix_locator
     ports:
       - "8001:8001"
     depends_on:
@@ -75,7 +69,6 @@ services:
     build:
       context: ./distributed_self_healing_orchestrator
       dockerfile: dummy_bot/Dockerfile
-    container_name: ominifix_bot_normal
     command: ["python","bot.py"]
     environment:
       - MONITOR_URL=http://orchestrator_monitor:8000/heartbeat
@@ -86,13 +79,28 @@ services:
     build:
       context: ./distributed_self_healing_orchestrator
       dockerfile: dummy_bot/Dockerfile
-    container_name: ominifix_bot_fail
     command: ["python","bot_fail.py"]
     environment:
       - MONITOR_URL=http://orchestrator_monitor:8000/heartbeat
     depends_on:
       - orchestrator_monitor
 
+  sliit_pdp_rpa_bot:
+    build:
+      context: ./sliit_pdp_rpa
+      dockerfile: Dockerfile
+    environment:
+      - PYTHONUNBUFFERED=1
+    volumes:
+      - ./sliit_pdp_rpa/outputs:/app/outputs
+      - ./sliit_pdp_rpa/logs:/app/logs
+    depends_on:
+      - orchestrator_monitor
+      - ai_element_locator
+    restart: unless-stopped
+
 volumes:
   rabbitmq_data:
+    external: true
     name: ominifix_rabbitmq_data
+ 

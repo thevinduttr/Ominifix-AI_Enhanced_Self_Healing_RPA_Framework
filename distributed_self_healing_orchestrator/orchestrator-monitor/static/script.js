@@ -38,11 +38,28 @@ function renderFailures(failures){
     }
     const meta = [];
     if(f.failure_type) meta.push(`<strong>Type:</strong> ${escapeHtml(f.failure_type)}`);
-    if(f.last_action) meta.push(`<strong>Action:</strong> ${escapeHtml(f.last_action)}`);
+    if(f.last_action || f.failed_action) meta.push(`<strong>Action:</strong> ${escapeHtml(f.failed_action || f.last_action)}`);
     if(f.strategy) meta.push(`<strong>Strategy:</strong> ${escapeHtml(f.strategy)}`);
     if(f.priority) meta.push(`<strong>Priority:</strong> ${escapeHtml(f.priority)}`);
+    
+    // New comprehensive fields display
+    const comprehensiveInfo = [];
+    if(f.page_url) comprehensiveInfo.push(`<strong>Page URL:</strong> <a href="${escapeHtml(f.page_url)}" target="_blank" style="color:#60a5fa">${escapeHtml(f.page_url).slice(0,60)}${f.page_url.length>60?'...':''}</a>`);
+    if(f.element_role) comprehensiveInfo.push(`<strong>Element Role:</strong> ${escapeHtml(f.element_role)}`);
+    if(f.expected_text) comprehensiveInfo.push(`<strong>Expected Text:</strong> ${escapeHtml(f.expected_text).slice(0,50)}${f.expected_text.length>50?'...':''}`);
+    if(f.old_locator) comprehensiveInfo.push(`<strong>Old Locator:</strong> <code style="background:rgba(0,0,0,0.3);padding:2px 6px;border-radius:4px">${escapeHtml(f.old_locator).slice(0,60)}${f.old_locator.length>60?'...':''}</code>`);
+    if(f.old_locator_type) comprehensiveInfo.push(`<strong>Locator Type:</strong> ${escapeHtml(f.old_locator_type)}`);
+    if(f.screenshot_path) comprehensiveInfo.push(`<strong>Screenshot:</strong> <span style="color:#10b981">${escapeHtml(f.screenshot_path.split('/').pop())}</span>`);
+    
+    const comprehensiveHtml = comprehensiveInfo.length > 0 ? `<div style="margin-top:8px;color:#cbd5e1;font-size:0.85rem;line-height:1.8">${comprehensiveInfo.join('<br>')}</div>` : '';
+    
     const domSnippet = f.dom ? escapeHtml(f.dom).slice(0,200) + (f.dom.length>200? '...':'') : '';
     const domHtml = f.dom ? `<details style="margin-top:8px"><summary style="cursor:pointer">View DOM snapshot</summary><pre style="white-space:pre-wrap;max-height:220px;overflow:auto;background:rgba(0,0,0,0.04);padding:8px;border-radius:6px">${escapeHtml(f.dom)}</pre></details>` : '';
+    
+    // Page HTML info
+    const pageHtmlSize = f.page_html ? (f.page_html.length / 1024).toFixed(2) : null;
+    const pageHtmlInfo = pageHtmlSize ? `<div style="margin-top:8px;color:#fbbf24;font-size:0.85rem"><strong>Page HTML:</strong> ${pageHtmlSize} KB captured</div>` : '';
+    
     return `
       <div class="failure-card" data-idx="${idx}" style="margin-bottom:10px;padding:10px;border-radius:8px;background:rgba(255,255,255,0.02);cursor:pointer">
         <div style="display:flex;justify-content:space-between;align-items:center">
@@ -51,6 +68,8 @@ function renderFailures(failures){
         </div>
         ${err}
         <div style="margin-top:8px;color:var(--muted);font-size:0.85rem">${meta.join(' • ')}</div>
+        ${comprehensiveHtml}
+        ${pageHtmlInfo}
         ${domHtml}
       </div>
     `;
@@ -89,45 +108,71 @@ function showFailureJson(failure){
   }catch(e){
     pre.textContent = String(failure);
   }
-  // populate structured fields
+  // populate structured fields with comprehensive data
   const fieldsEl = document.getElementById('failure-fields');
     if(fieldsEl){
       const parts = [];
+      // Original fields
       if(failure.failure_type) parts.push(['Type', failure.failure_type]);
-      if(failure.last_action) parts.push(['Last action', failure.last_action]);
+      if(failure.last_action || failure.failed_action) parts.push(['Last action', failure.failed_action || failure.last_action]);
       if(failure.strategy) parts.push(['Strategy', failure.strategy]);
       if(failure.priority) parts.push(['Priority', failure.priority]);
       if(failure.category) parts.push(['Category', failure.category + (failure.confidence ? ` (${Math.round(failure.confidence*100)}%)` : '')]);
+      
+      // Comprehensive new fields
+      if(failure.page_url) parts.push(['Page URL', failure.page_url]);
+      if(failure.element_role) parts.push(['Element Role', failure.element_role]);
+      if(failure.expected_text) parts.push(['Expected Text', failure.expected_text]);
+      if(failure.old_locator) parts.push(['Old Locator', failure.old_locator]);
+      if(failure.old_locator_type) parts.push(['Locator Type', failure.old_locator_type]);
+      if(failure.screenshot_path) parts.push(['Screenshot', failure.screenshot_path]);
+      if(failure.page_html) parts.push(['Page HTML Size', `${(failure.page_html.length / 1024).toFixed(2)} KB`]);
+      
+      // Metadata object fields
+      if(failure.metadata){
+        if(failure.metadata.bot_id) parts.push(['Metadata: Bot ID', failure.metadata.bot_id]);
+        if(failure.metadata.workflow_step) parts.push(['Workflow Step', failure.metadata.workflow_step]);
+        if(failure.metadata.base_url) parts.push(['Base URL', failure.metadata.base_url]);
+        if(failure.metadata.target_url) parts.push(['Target URL', failure.metadata.target_url]);
+        if(failure.metadata.timestamp) parts.push(['Metadata Timestamp', new Date(failure.metadata.timestamp).toLocaleString()]);
+        if(failure.metadata.error_type) parts.push(['Error Type', failure.metadata.error_type]);
+      }
+      
       parts.push(['Bot ID', failure.botId || '']);
       parts.push(['Timestamp', failure.timestamp ? new Date(failure.timestamp*1000).toLocaleString() : '']);
       fieldsEl.innerHTML = parts.map(p => {
         const key = escapeHtml(p[0]);
         const val = escapeHtml(String(p[1]||''));
-        const valHtml = (p[0] === 'Category') ? `<span class="category-badge" style="font-size:0.95rem">${val}</span>` : val;
+        const valHtml = (p[0] === 'Category') ? `<span class="category-badge" style="font-size:0.95rem">${val}</span>` : 
+                        (p[0].includes('URL') || p[0] === 'Screenshot') ? `<span style="word-break:break-all;font-size:0.85rem">${val}</span>` :
+                        (p[0].includes('Locator')) ? `<code style="background:rgba(0,0,0,0.3);padding:4px 8px;border-radius:4px;font-size:0.85rem;display:block;margin-top:4px">${val}</code>` :
+                        val;
         return `<div style="min-width:160px;padding:8px;border-radius:8px;background:rgba(255,255,255,0.02)"><div style="font-size:12px;color:var(--muted)">${key}</div><div style="font-weight:700;margin-top:6px">${valHtml}</div></div>`;
       }).join('');
     }
 
-  // prepare DOM render button
+  // prepare DOM render button (for page_html if available, fallback to dom)
   const domContainer = document.getElementById('failure-dom-container');
   const renderBtn = document.getElementById('failure-render-dom');
   if(renderBtn && domContainer){
-    if(failure.dom){
+    const htmlContent = failure.page_html || failure.dom;
+    if(htmlContent){
       renderBtn.style.display = 'inline-block';
       domContainer.style.display = 'none';
+      renderBtn.textContent = failure.page_html ? 'Render Page HTML' : 'Render DOM';
       renderBtn.onclick = ()=>{
         // sanitize by not executing scripts: use sandboxed iframe with no allow-scripts
         domContainer.innerHTML = '';
         const iframe = document.createElement('iframe');
         iframe.setAttribute('sandbox', '');
         iframe.style.width = '100%';
-        iframe.style.height = '400px';
+        iframe.style.height = '500px';
         iframe.style.border = '0';
         try{
-          iframe.srcdoc = failure.dom;
+          iframe.srcdoc = htmlContent;
         }catch(e){
-          // fallback: show escaped DOM inside pre
-          domContainer.innerHTML = `<pre style="white-space:pre-wrap;padding:8px">${escapeHtml(failure.dom)}</pre>`;
+          // fallback: show escaped HTML inside pre
+          domContainer.innerHTML = `<pre style="white-space:pre-wrap;padding:8px;max-height:500px;overflow:auto">${escapeHtml(htmlContent)}</pre>`;
           domContainer.style.display = 'block';
           modal.style.display = 'flex';
           return;

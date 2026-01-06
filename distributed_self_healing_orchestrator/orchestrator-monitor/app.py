@@ -22,7 +22,11 @@ async def heartbeat(data: dict):
 
 @app.post('/report_failure')
 async def report_failure(data: dict):
-    return process_failure(data)
+    print(f"🔍 RECEIVED FAILURE DATA KEYS: {list(data.keys())}")
+    print(f"🔍 RECEIVED DATA: {data}")
+    result = process_failure(data)
+    print(f"🔍 PROCESS RESULT: {result}")
+    return result
 
 
 @app.get("/status")

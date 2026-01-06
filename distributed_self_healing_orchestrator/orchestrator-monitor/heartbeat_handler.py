@@ -33,18 +33,33 @@ def process_failure(data):
     if not bot_id:
         return {"status": "error", "reason": "missing botId"}
 
+    print(f"🔍 process_failure() received keys: {list(data.keys())}")
+    print(f"🔍 Data has page_url: {data.get('page_url')}")
+    
     now = time.time()
-    # store failure details
+    # store failure details with all comprehensive fields
     failure = {
         'botId': bot_id,
         'timestamp': now,
         'error': data.get('error'),
         'dom': data.get('dom'),
-        'last_action': data.get('last_action'),
+        'last_action': data.get('last_action') or data.get('failed_action'),  # Support both field names
         'failure_type': data.get('failure_type'),
         'strategy': data.get('strategy'),
-        'priority': data.get('priority')
+        'priority': data.get('priority'),
+        # Comprehensive fields from enhanced bot
+        'page_url': data.get('page_url'),
+        'element_role': data.get('element_role'),
+        'expected_text': data.get('expected_text'),
+        'old_locator': data.get('old_locator'),
+        'old_locator_type': data.get('old_locator_type'),
+        'page_html': data.get('page_html'),
+        'screenshot_path': data.get('screenshot_path'),
+        'metadata': data.get('metadata')
     }
+    
+    print(f"🔍 Created failure object with keys: {list(failure.keys())}")
+    print(f"🔍 Failure has page_url: {failure.get('page_url')}")
 
     # mark bot as failed in bots dict
     info = bots.get(bot_id, {})
@@ -59,6 +74,8 @@ def process_failure(data):
     failures.insert(0, failure)
     if len(failures) > 200:
         failures.pop()
+    
+    print(f"🔍 Added to failures list. Current failures[0] keys: {list(failures[0].keys())}")
 
     # notify coordinator via MQ
     try:
