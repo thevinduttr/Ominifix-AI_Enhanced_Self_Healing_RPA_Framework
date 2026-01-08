@@ -32,7 +32,7 @@ st.markdown(
     unsafe_allow_html=True
 )
 
-st.title("🩹 Ominifix — AI-Enhanced Code Healing Engine (PP1)")
+st.title("🩹 Ominifix — AI-Enhanced Code Healing Engine")
 st.caption(f"Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}  |  Root: {PROJECT_ROOT}")
 
 tabs = st.tabs(["🧩 Single Heal", "📦 Batch", "ℹ️ About"])
@@ -257,11 +257,11 @@ with tabs[2]:
 - **scikit-learn** (Strategy Selection ML model)
 - **TF-IDF / RandomForest / Logistic Regression** (strategy classifier options)
 - **LibCST** (AST-safe script patching, formatting preserved)
-- **Streamlit** (PP1 demo UI)
+- **Streamlit** (UI)
         """
     )
 
-    st.markdown("### How the system works (PP1 explanation)")
+    st.markdown("### How the system works")
     st.markdown(
         """
 1) Receive ELR JSON with failure + DOM evidence  
