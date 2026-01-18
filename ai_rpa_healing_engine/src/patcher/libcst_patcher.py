@@ -37,7 +37,7 @@ def _get_call_method_name(call: cst.Call) -> Optional[str]:
 def _literal_string_value(node: cst.CSTNode) -> Optional[str]:
     if isinstance(node, cst.SimpleString):
         try:
-            return cst.literal_eval(node.value)
+            return ast.literal_eval(node.value)
         except Exception:
             return None
     return None
