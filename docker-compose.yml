@@ -30,11 +30,12 @@ services:
     ports:
       - "8000:8000"
     environment:
-      MODEL_URL: http://model_server:8002/classify
+      MODEL_URL: http://host.docker.internal:8090/predict  # Your deployed model
       RABBIT_HOST: rabbitmq
     depends_on:
       - rabbitmq
-      - model_server
+    extra_hosts:
+      - "host.docker.internal:host-gateway"  # Allow container to reach host services
 
   ai_healing_engine:
     build:
@@ -85,19 +86,19 @@ services:
     depends_on:
       - orchestrator_monitor
 
-  sliit_pdp_rpa_bot:
-    build:
-      context: ./sliit_pdp_rpa
-      dockerfile: Dockerfile
-    environment:
-      - PYTHONUNBUFFERED=1
-    volumes:
-      - ./sliit_pdp_rpa/outputs:/app/outputs
-      - ./sliit_pdp_rpa/logs:/app/logs
-    depends_on:
-      - orchestrator_monitor
-      - ai_element_locator
-    restart: unless-stopped
+  # sliit_pdp_rpa_bot:
+  #   build:
+  #     context: ./sliit_pdp_rpa
+  #     dockerfile: Dockerfile
+  #   environment:
+  #     - PYTHONUNBUFFERED=1
+  #   volumes:
+  #     - ./sliit_pdp_rpa/outputs:/app/outputs
+  #     - ./sliit_pdp_rpa/logs:/app/logs
+  #   depends_on:
+  #     - orchestrator_monitor
+  #     - ai_element_locator
+  #   restart: unless-stopped
 
 volumes:
   rabbitmq_data:

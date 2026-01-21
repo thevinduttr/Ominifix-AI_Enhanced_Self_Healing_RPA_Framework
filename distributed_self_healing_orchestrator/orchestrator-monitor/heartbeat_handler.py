@@ -41,7 +41,7 @@ def process_failure(data):
     failure = {
         'botId': bot_id,
         'timestamp': now,
-        'error': data.get('error'),
+        'error': data.get('error') or data.get('error_message'),  # Support both field names
         'dom': data.get('dom'),
         'last_action': data.get('last_action') or data.get('failed_action'),  # Support both field names
         'failure_type': data.get('failure_type'),
@@ -99,18 +99,22 @@ def process_failure(data):
 def _classify_failure(model_url, failure):
     """Call external model to classify the failure and attach result into the failure record.
     This runs in a background thread and updates the shared failures/bots structures in-place.
-    The model is expected to accept JSON and respond with JSON containing a `category` field.
+    The model expects: error_message, retry_count, exec_time_ms, ui_change_score, network_latency
     """
     try:
+        # Extract metadata for your model's expected format
+        metadata = failure.get('metadata') or {}
+        error_msg = failure.get('error') or failure.get('error_message') or 'Unknown error'
+        
+        # Map failure data to your model's input format
         payload = {
-            'botId': failure.get('botId'),
-            'error': failure.get('error'),
-            'failure_type': failure.get('failure_type'),
-            'last_action': failure.get('last_action'),
-            'strategy': failure.get('strategy'),
-            'priority': failure.get('priority')
+            'error_message': error_msg,
+            'retry_count': metadata.get('retry_count', 1),  # default to 1 if not provided
+            'exec_time_ms': metadata.get('exec_time_ms', 5000),  # default 5s
+            'ui_change_score': metadata.get('ui_change_score', 0.5),  # neutral default
+            'network_latency': metadata.get('network_latency', 100)  # default 100ms
         }
-        print(f"[classifier] POST {model_url} payload keys={list(payload.keys())}")
+        print(f"[classifier] POST {model_url} payload={payload}")
         resp = requests.post(model_url, json=payload, timeout=5)
         status = getattr(resp, 'status_code', None)
         try:
@@ -129,8 +133,8 @@ def _classify_failure(model_url, failure):
             if j is None:
                 cat = 'unknown'
             else:
-                # prefer common keys
-                cat = j.get('category') or j.get('label') or j.get('prediction')
+                # prefer common keys - support error_class_name for user's custom model
+                cat = j.get('category') or j.get('label') or j.get('prediction') or j.get('error_class_name')
                 if not cat:
                     # some models return a top-level result
                     cat = j
@@ -152,16 +156,20 @@ def _classify_failure(model_url, failure):
     # attach category back to the failure object (first attempt: mutate the object in failures list)
     try:
         # attach category and confidence into the recorded failure
+        original_ft = failure.get('failure_type')
         failure['category'] = cat
+        # reflect the model label as failure_type so UI shows model output directly
+        if cat:
+            failure['failure_type'] = cat
         if confidence is not None:
             failure['confidence'] = confidence
 
-        # If the model is unknown or low-confidence, fall back to the original failure_type
+        # Only fallback if model returned nothing/unknown (do NOT override on low confidence)
         try:
-            if (not cat or cat == 'unknown') or (isinstance(confidence, float) and confidence < 0.5):
-                fb = failure.get('failure_type')
-                if fb:
-                    failure['category'] = fb
+            if not cat or cat == 'unknown':
+                if original_ft:
+                    failure['category'] = original_ft
+                    failure['failure_type'] = original_ft
         except Exception:
             pass
 
@@ -171,6 +179,8 @@ def _classify_failure(model_url, failure):
             b = bots[bid]
             if b.get('last_error') and b['last_error'].get('timestamp') == failure.get('timestamp'):
                 b['last_error']['category'] = failure.get('category')
+                if failure.get('failure_type'):
+                    b['last_error']['failure_type'] = failure.get('failure_type')
                 if failure.get('confidence') is not None:
                     b['last_error']['confidence'] = failure.get('confidence')
                 bots[bid] = b

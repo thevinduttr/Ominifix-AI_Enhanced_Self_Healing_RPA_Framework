@@ -39,61 +39,6 @@ while True:
             print(f'Failure payload sent for {BOT_ID}')
         except Exception as e:
             print('Failed to send failure payload:', e)
-        # send additional CSV-style Selenium errors (if any)
-        csv_failures = [
-            "365be480-6700-49e9-9aee-e05575be2a36,2025-11-29T00:39:16.375075,Error: page.evaluate(): ExecutionContext destroyed,<section><button class='submit'>Submit</button></section>,type()(input[name='email']),selenium-bot-1,Low,JSExecutionErro",
-            "25a00978-0bc6-471a-9f88-d17e51b0ec0c,2025-11-28T23:47:16.375075,AssertionError: expected text 'Success' but found 'Error',<div class='login'><input id='password'/><button id='login-btn'>Login</button></div>,click()(input[name='email']),automation-node-02,High,AssertionFailure"
-        ]
-        for line in csv_failures:
-            try:
-                parts = line.split(',', 7)
-                if len(parts) < 8:
-                    print('Skipping malformed csv failure:', line)
-                    continue
-                _, ts, err_msg, dom_snip, action, botname, priority, ftype = parts
-                extra_payload = {
-                    'botId': botname,
-                    'error': err_msg,
-                    'dom': dom_snip,
-                    'last_action': action,
-                    'failure_type': ftype,
-                    'strategy': 'JSExecution',
-                    'priority': priority
-                }
-                requests.post(rf_url, json=extra_payload, timeout=2)
-                print(f'CSV failure sent for {botname}: {ftype}')
-            except Exception as e:
-                print('Failed to send csv failure line:', e)
-        # also send the user-provided CSV-style Selenium error payloads (one or more)
-        try:
-            csv_lines = [
-                "365be480-6700-49e9-9aee-e05575be2a36,2025-11-29T00:39:16.375075,Error: page.evaluate(): ExecutionContext destroyed,<section><button class='submit'>Submit</button></section>,type()(input[name='email']),selenium-bot-1,Low,JSExecutionErro",
-                "25a00978-0bc6-471a-9f88-d17e51b0ec0c,2025-11-28T23:47:16.375075,AssertionError: expected text 'Success' but found 'Error',<div class='login'><input id='password'/><button id='login-btn'>Login</button></div>,click()(input[name='email']),automation-node-02,High,AssertionFailure"
-            ]
-            for csv_line in csv_lines:
-                parts = csv_line.split(',', 7)
-                if len(parts) == 8:
-                    uid, ts, err_msg, dom_html, selector, csv_botid, priority, ftype = parts
-                    csv_payload = {
-                        "botId": csv_botid,
-                        "error": err_msg,
-                        "dom": dom_html,
-                        "last_action": selector,
-                        "failure_type": ftype or 'JSExecutionError',
-                        "strategy": 'JSExecution',
-                        "priority": priority,
-                        "external_id": uid,
-                        "reported_at": ts
-                    }
-                    try:
-                        requests.post(rf_url, json=csv_payload, timeout=2)
-                        print(f'CSV-style failure payload sent for {csv_botid}')
-                    except Exception as e:
-                        print('Failed to send CSV-style failure payload:', e)
-                else:
-                    print('CSV payload malformed, skipping:', csv_line)
-        except Exception as e:
-            print('Error preparing CSV payloads:', e)
         print(f'{BOT_ID} simulating failure (stopped heartbeats)')
         break
     count += 1

@@ -3,16 +3,25 @@ from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from heartbeat_handler import process_heartbeat, process_failure, bots, failures
 from failure_detector import start_failure_detection
+from pathlib import Path
+import os
+
+# Get the directory of this file
+SCRIPT_DIR = Path(__file__).parent
 
 app = FastAPI()
 
 # Serve static UI files from the `static` folder
-app.mount("/static", StaticFiles(directory="static"), name="static")
+static_dir = SCRIPT_DIR / "static"
+app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
+
+# Log effective model URL on startup for quick diagnostics
+print(f"[startup] MODEL_URL={os.environ.get('MODEL_URL') or '<unset>'}")
 
 
 @app.get("/")
 async def index():
-    return FileResponse("static/index.html")
+    return FileResponse(str(SCRIPT_DIR / "static" / "index.html"))
 
 
 @app.post("/heartbeat")
