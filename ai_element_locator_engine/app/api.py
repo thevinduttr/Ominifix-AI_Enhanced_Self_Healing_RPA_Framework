@@ -69,5 +69,14 @@ def generate_locator_report(payload: FailureFromOrchestrator):
     candidate element and its reliability score.
     """
     logger.info("Incoming /element-locator/report request")
+
+    # Debug log: confirm vision fields arrive from dashboard / swagger
+    logger.info(
+        "Payload vision inputs: screenshot_path=%s template_path=%s page_html_provided=%s",
+        payload.screenshot_path,
+        payload.template_path,
+        bool(payload.page_html),
+    )
+    
     report = locator_engine.locate_and_build_report(payload)
     return JSONResponse(content=report.model_dump(mode="json"))
