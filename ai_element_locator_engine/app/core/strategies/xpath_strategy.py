@@ -9,7 +9,7 @@ changes occurred in the DOM structure.
 from __future__ import annotations
 
 import logging
-from typing import List
+from typing import List, Optional
 
 from lxml import etree
 
@@ -23,14 +23,18 @@ logger = logging.getLogger(__name__)
 
 class XPathStrategy(LocatorStrategy):
     name = "xpath_original"
+    requires_dom = True
 
     def find_candidates(
         self,
-        dom: DomSnapshot,
+        dom: Optional[DomSnapshot],
         failure: FailureFromOrchestrator,
     ) -> List[ElementCandidateInternal]:
         candidates: List[ElementCandidateInternal] = []
 
+        if dom is None:
+            return candidates
+        
         if not failure.old_locator or failure.old_locator_type != "xpath":
             return candidates
 
