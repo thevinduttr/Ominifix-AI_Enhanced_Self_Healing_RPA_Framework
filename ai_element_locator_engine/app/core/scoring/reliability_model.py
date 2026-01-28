@@ -2,15 +2,22 @@
 app.core.scoring.reliability_model
 
 Wrapper around the ML model used to estimate final reliability scores for
-candidate elements. If a trained model is not yet available, we fall back
-to using the heuristic_score directly.
+candidate elements. 
+
+Important fix for VisionStrategy:
+- The ML model is trained mainly on DOM-derived features, so vision-only
+  candidates can get artificially low probabilities.
+- We therefore apply a safeguard: for vision candidates, final_score is
+  at least their heuristic_score (or a weighted mix, configurable).
+
+If a trained model is not available, we fall back to heuristic_score.
 """
 
 from __future__ import annotations
 
 import logging
 from pathlib import Path
-from typing import List
+from typing import List, Optional
 
 import numpy as np
 from sklearn.ensemble import RandomForestClassifier
@@ -22,6 +29,7 @@ from app.core.scoring.feature_builder import build_feature_matrix
 
 logger = logging.getLogger(__name__)
 
+VISION_STRATEGY_NAME = "vision_template_match"
 
 class ReliabilityModel:
     def __init__(self, model_path: str | Path = "data/models/reliability_model.pkl"):
@@ -47,24 +55,46 @@ class ReliabilityModel:
 
         If no ML model is available or it is not fitted, the heuristic_score
         is simply copied into final_score.
+
+        Vision fix:
+        - For VisionStrategy candidates, final_score is clamped to be at least
+          heuristic_score to avoid ML under-confidence on vision-only features.
         """
         if not candidates:
             return
+        
+        # Always have a safe baseline
+        for c in candidates:
+            c.final_score = float(c.heuristic_score)
 
-        X, _ = build_feature_matrix(candidates)
-
+        # If model not available, stop here (heuristics already applied)
         if self.model is None:
-            for c in candidates:
-                c.final_score = float(c.heuristic_score)
+            return
+
+        try:
+            X, _ = build_feature_matrix(candidates)
+        except Exception as exc:
+            logger.exception("Failed to build feature matrix; using heuristics only: %s", exc)
             return
 
         try:
             proba: np.ndarray = self.model.predict_proba(X)[:, 1]
         except NotFittedError:
-            logger.error("Reliability model exists but is not fitted; using heuristics.")
-            for c in candidates:
-                c.final_score = float(c.heuristic_score)
+            logger.error("Reliability model exists but is not fitted; using heuristics only.")
+            return
+        except Exception as exc:
+            logger.exception("Reliability model scoring failed; using heuristics only: %s", exc)
             return
 
+        # Apply ML scores, then enforce vision safeguard
         for c, p in zip(candidates, proba):
-            c.final_score = float(p)
+            ml_score = float(p)
+
+            # Default behavior: ML score wins
+            final = ml_score
+
+            # Vision safeguard: don't allow ML to push below heuristic
+            if c.strategy == VISION_STRATEGY_NAME:
+                final = max(ml_score, float(c.heuristic_score))
+
+            c.final_score = final
