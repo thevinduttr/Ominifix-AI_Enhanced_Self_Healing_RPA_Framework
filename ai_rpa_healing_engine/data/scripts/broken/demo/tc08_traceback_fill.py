@@ -1,16 +1,15 @@
 from playwright.sync_api import sync_playwright
-import time
 
 
 def run():
     with sync_playwright() as p:
-        browser = p.chromium.launch(headless=False)
+        browser = p.chromium.launch(headless=True)
         page = browser.new_page()
 
         page.goto("https://www.sliit.lk/")
 
-        # Step 01 
-        page.fill("textarea[name='qqq']", "OpenAI")
+        # TC-08: Traceback scenario — broken text input with raw error trace available
+        page.fill("input[name='search_query_BROKEN']", "Computer Science")
 
         page.keyboard.press("Enter")
         page.wait_for_timeout(2000)

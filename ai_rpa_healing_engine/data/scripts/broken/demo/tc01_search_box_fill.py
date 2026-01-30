@@ -8,9 +8,10 @@ def run():
         page = browser.new_page()
 
         page.goto("https://www.google.com")
+        time.sleep(1)
 
-        # Search box (this is the locator we will break later)
-        page.fill("textarea[name='qqq']", "OpenAI")
+        # TC-01: Search box fill — broken name attribute (qqq instead of q)
+        page.fill("textarea[name='qqq']", "OpenAI self-healing RPA")
 
         page.keyboard.press("Enter")
         page.wait_for_timeout(2000)
