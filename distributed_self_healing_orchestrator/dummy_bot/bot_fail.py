@@ -25,7 +25,7 @@ while True:
 
         failure_payload = {
             "botId": BOT_ID,
-            "error": f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] SeleniumError: element not interactable\n{selenium_trace}",
+            "error": f"element not interactable\n{selenium_trace}",
             "dom": "<html><body><button id='submit'>Submit</button><div id='status'>Loading...</div></body></html>",
             "last_action": "Click #submit",
             "failure_type": "SeleniumError",

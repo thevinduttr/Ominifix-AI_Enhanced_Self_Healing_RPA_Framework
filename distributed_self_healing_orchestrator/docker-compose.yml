@@ -39,6 +39,18 @@ services:
       - rabbitmq
       - model_server
 
+  frontend_monitor:
+    build:
+      context: .
+      dockerfile: frontend_monitor/Dockerfile
+    container_name: ominifix_frontend
+    ports:
+      - "3000:3000"
+    depends_on:
+      - orchestrator_monitor
+    networks:
+      - default
+
   ai_healing_engine:
     build:
       context: .

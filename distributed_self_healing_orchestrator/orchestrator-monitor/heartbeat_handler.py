@@ -84,14 +84,14 @@ def process_failure(data):
         pass
 
     # kick off async classification using external model if configured
-    model_url = os.environ.get('MODEL_URL')
+    model_url = os.environ.get('MODEL_URL') or 'http://localhost:8090/predict'
     if model_url:
         try:
             threading.Thread(target=_classify_failure, args=(model_url, failure), daemon=True).start()
             # optimistically set category to 'pending'
             failure['category'] = 'pending'
         except Exception:
-            failure['category'] = 'unknown'
+            failure['category'] = 'unknowng'
 
     return {'status': 'recorded'}
 
