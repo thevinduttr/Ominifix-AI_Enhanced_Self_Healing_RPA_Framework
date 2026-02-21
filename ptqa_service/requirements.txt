@@ -1,0 +1,10 @@
+fastapi
+uvicorn
+pydantic
+scikit-learn
+pandas
+numpy
+sqlalchemy
+playwright
+selenium 
+webdriver-manager
