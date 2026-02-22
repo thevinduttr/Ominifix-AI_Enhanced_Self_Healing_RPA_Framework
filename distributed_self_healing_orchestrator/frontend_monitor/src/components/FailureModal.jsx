@@ -3,6 +3,7 @@ import { escapeHtml } from '../utils/helpers'
 
 function FailureModal({ failure, onClose }) {
   const [showDom, setShowDom] = useState(false)
+  const soundLabel = (failure?.metadata && failure.metadata.sound) || 'Alert tone'
 
   const handleOverlayClick = (e) => {
     if (e.target.id === 'failure-overlay') {
@@ -24,6 +25,9 @@ function FailureModal({ failure, onClose }) {
         failure.category +
           (failure.confidence ? ` (${Math.round(failure.confidence * 100)}%)` : ''),
       ])
+    if (failure.category || failure.failure_type)
+      parts.push(['Classification Error Type', failure.category || failure.failure_type])
+    parts.push(['Sound', soundLabel])
 
     if (failure.page_url) parts.push(['Page URL', failure.page_url])
     if (failure.element_role) parts.push(['Element Role', failure.element_role])

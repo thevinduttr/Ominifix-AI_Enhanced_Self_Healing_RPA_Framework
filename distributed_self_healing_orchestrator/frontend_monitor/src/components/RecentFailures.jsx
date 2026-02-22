@@ -18,6 +18,9 @@ function RecentFailures({ failures, onFailureClick }) {
           meta.push(`Action: ${f.failed_action || f.last_action}`)
         if (f.strategy) meta.push(`Strategy: ${f.strategy}`)
         if (f.priority) meta.push(`Priority: ${f.priority}`)
+        if (f.category) meta.push(`Classified: ${f.category}`)
+        const soundLabel = (f.metadata && f.metadata.sound) || 'Alert tone'
+        if (f.category || f.failure_type) meta.push(`Sound: ${soundLabel}`)
 
         const categoryBadge = f.category ? (
           <div style={{ marginLeft: '8px', display: 'inline-block' }}>
