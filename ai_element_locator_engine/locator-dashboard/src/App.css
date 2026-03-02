@@ -1,42 +1,325 @@
+/* Make dashboard full width */
 #root {
-  max-width: 1280px;
-  margin: 0 auto;
-  padding: 2rem;
-  text-align: center;
+  width: 100%;
+  max-width: none;
+  margin: 0;
+  padding: 0;
+  text-align: left;
 }
 
-.logo {
-  height: 6em;
-  padding: 1.5em;
-  will-change: filter;
-  transition: filter 300ms;
-}
-.logo:hover {
-  filter: drop-shadow(0 0 2em #646cffaa);
-}
-.logo.react:hover {
-  filter: drop-shadow(0 0 2em #61dafbaa);
+/* Page wrapper */
+.page {
+  min-height: 100vh;
+  padding: 22px 18px 28px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
 }
 
-@keyframes logo-spin {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
+/* Overall max width so it fits wide screens but not too wide */
+:root {
+  --page-max: 1480px;
+  --gap: 18px;
+  --radius: 14px;
 }
 
-@media (prefers-reduced-motion: no-preference) {
-  a:nth-of-type(2) .logo {
-    animation: logo-spin infinite 20s linear;
-  }
+/* Header */
+.header {
+  width: 100%;
+  max-width: var(--page-max);
+  margin-bottom: 14px;
 }
 
+.header h1 {
+  margin: 0 0 6px;
+}
+
+.subtitle {
+  margin: 0;
+  opacity: 0.8;
+}
+
+/* Cards */
 .card {
-  padding: 2em;
+  width: 100%;
+  border-radius: var(--radius);
+  padding: 16px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.08);
 }
 
-.read-the-docs {
-  color: #888;
+/* Metrics card */
+.card-metrics {
+  max-width: var(--page-max);
+  margin-bottom: var(--gap);
+}
+
+.metrics-row {
+  display: grid;
+  grid-template-columns: 140px 140px 1fr;
+  gap: 14px;
+  align-items: center;
+}
+
+.metric-box {
+  padding: 12px;
+  border-radius: 12px;
+  background: rgba(0, 0, 0, 0.18);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+.metric-label {
+  font-size: 12px;
+  opacity: 0.8;
+}
+
+.metric-value {
+  margin-top: 6px;
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.metric-note {
+  font-size: 12px;
+  opacity: 0.75;
+  line-height: 1.35;
+}
+
+/* Main 2-column layout */
+.main {
+  width: 100%;
+  max-width: var(--page-max);
+  display: grid;
+  grid-template-columns: 1fr 1.2fr; /* Result slightly wider */
+  gap: var(--gap);
+  align-items: start;
+}
+
+/* Make each column panel scroll internally instead of the whole page */
+.card-form,
+.card-result {
+  max-height: calc(100vh - 230px);
+  overflow: auto;
+}
+
+/* Input card: keep room for sticky button */
+.card-form {
+  padding-bottom: 78px;
+  position: relative;
+}
+
+/* Sticky primary button so you never scroll to click it */
+.btn-primary {
+  width: 100%;
+  position: sticky;
+  bottom: 12px;
+  z-index: 5;
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(99, 102, 241, 0.9);
+  color: white;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.btn-primary:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* Scenario buttons */
+.scenario-row {
+  margin: 8px 0 14px;
+}
+
+.label {
+  display: inline-block;
+  margin-bottom: 6px;
+  font-size: 12px;
+  opacity: 0.8;
+}
+
+.scenario-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.btn-scenario {
+  padding: 7px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.04);
+  color: rgba(255, 255, 255, 0.92);
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.btn-scenario:hover {
+  background: rgba(255, 255, 255, 0.07);
+}
+
+/* Forms */
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 10px 0;
+}
+
+.form-row {
+  display: grid;
+  grid-template-columns: 1fr 180px;
+  gap: 12px;
+  align-items: end;
+}
+
+input,
+select,
+textarea {
+  width: 100%;
+  padding: 10px 10px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  background: rgba(0, 0, 0, 0.18);
+  color: rgba(255, 255, 255, 0.92);
+  outline: none;
+}
+
+textarea {
+  resize: vertical;
+}
+
+small {
+  opacity: 0.7;
+  font-size: 12px;
+  line-height: 1.25;
+}
+
+.error {
+  margin-top: 12px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  background: rgba(239, 68, 68, 0.08);
+}
+
+/* Result area */
+.score-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.grid-two {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+/* Code blocks: scroll inside, do not expand page */
+.code {
+  margin: 8px 0 12px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: rgba(0, 0, 0, 0.18);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  overflow: auto;
+  max-height: 180px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono",
+    "Courier New", monospace;
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.code.small {
+  max-height: 260px;
+}
+
+/* Charts */
+.charts-container {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-top: 8px;
+}
+
+.chart-card {
+  border-radius: 12px;
+  padding: 10px 12px;
+  background: rgba(0, 0, 0, 0.14);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  min-height: 260px;
+}
+
+.chart-placeholder {
+  opacity: 0.75;
+  font-size: 13px;
+}
+
+/* History */
+.card-history {
+  max-width: var(--page-max);
+  margin-top: var(--gap);
+  max-height: 260px;
+  overflow: auto;
+}
+
+.history-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.history-table th,
+.history-table td {
+  padding: 10px 8px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  font-size: 13px;
+  vertical-align: top;
+}
+
+.mono {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono",
+    "Courier New", monospace;
+  font-size: 12px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 420px;
+}
+
+/* Responsive */
+@media (max-width: 1100px) {
+  .main {
+    grid-template-columns: 1fr;
+  }
+
+  .charts-container {
+    grid-template-columns: 1fr;
+  }
+
+  .card-form,
+  .card-result {
+    max-height: none;
+    overflow: visible;
+    padding-bottom: 16px;
+  }
+
+  .btn-primary {
+    position: static;
+  }
+
+  .grid-two {
+    grid-template-columns: 1fr;
+  }
+
+  .metrics-row {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .metric-note {
+    grid-column: 1 / -1;
+  }
 }

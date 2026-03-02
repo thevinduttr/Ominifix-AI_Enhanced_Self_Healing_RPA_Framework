@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   PieChart,
   Pie,
@@ -24,6 +24,7 @@ const MODEL_METRICS = {
 // Simple color palette for charts
 const COLORS = ["#6366F1", "#F97316", "#22C55E", "#EAB308", "#EC4899"];
 
+// DOM scenarios (already in your dashboard)
 const PREDEFINED_SCENARIOS = [
   {
     id: "id_changed",
@@ -71,7 +72,39 @@ const PREDEFINED_SCENARIOS = [
   },
 ];
 
+// Vision scenarios (based on your folders)
+const VISION_SCENARIOS = [
+  {
+    id: "vision_login_v1",
+    label: "Vision: Login button (v1)",
+    description: "Template match login button inside login_v1.png",
+    page_url: "https://dummy.local/login",
+    expected_text: "Login",
+    screenshot_path: "data/raw/screenshots/full/login_v1.png",
+    template_path: "data/raw/screenshots/templates/login_button.png",
+  },
+  {
+    id: "vision_login_style_changed",
+    label: "Vision: Login button (style changed)",
+    description: "Template match login button in style-changed screenshot",
+    page_url: "https://dummy.local/login",
+    expected_text: "Sign In",
+    screenshot_path: "data/raw/screenshots/full/login_v2_style_changed.png",
+    template_path: "data/raw/screenshots/templates/login_button.png",
+  },
+  {
+    id: "vision_dropdown",
+    label: "Vision: Dropdown select",
+    description: "Template match dropdown in dropdown_v1.png",
+    page_url: "https://dummy.local/dropdown",
+    expected_text: "Please select an option",
+    screenshot_path: "data/raw/screenshots/full/dropdown_v1.png",
+    template_path: "data/raw/screenshots/templates/dropdown_select.png",
+  },
+];
+
 function App() {
+  // DOM inputs
   const [pageUrl, setPageUrl] = useState("https://dummy.local/login");
   const [expectedText, setExpectedText] = useState("Login");
   const [oldLocator, setOldLocator] = useState("//button[@id='login_old']");
@@ -79,6 +112,10 @@ function App() {
   const [rawHtml, setRawHtml] = useState(
     '<!doctype html><html><body><form><h1>Welcome</h1><button id="login_new" class="btn primary">Login</button></form></body></html>'
   );
+
+  // Vision inputs
+  const [screenshotPath, setScreenshotPath] = useState("");
+  const [templatePath, setTemplatePath] = useState("");
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -128,6 +165,11 @@ function App() {
       old_locator_type: oldLocatorType,
       error_message: "Manual test via dashboard",
       page_html: rawHtml.trim() || null,
+
+      // Vision fields (backend must support these)
+      screenshot_path: screenshotPath.trim() || null,
+      template_path: templatePath.trim() || null,
+
       metadata: {
         bot_id: "DASHBOARD-BOT",
         workflow_step: "demo_step",
@@ -158,7 +200,7 @@ function App() {
           },
           ...prev,
         ];
-        return next.slice(0, 20); // keep latest 20
+        return next.slice(0, 25); // keep latest 25
       });
     } catch (err) {
       console.error(err);
@@ -170,48 +212,76 @@ function App() {
 
   const candidate = currentReport?.element_candidate;
   const score = candidate?.score ?? null;
+  const extra = candidate?.extra ?? {};
 
   // ========== Predefined scenarios ==========
 
+  // DOM scenario apply
   function applyScenario(scenario) {
     setPageUrl(scenario.page_url);
     setExpectedText(scenario.expected_text);
     setOldLocatorType(scenario.old_locator_type);
     setOldLocator(scenario.old_locator);
     setRawHtml(scenario.page_html);
+
+    // clear vision fields
+    setScreenshotPath("");
+    setTemplatePath("");
+  }
+
+    // Vision scenario apply
+  function applyVisionScenario(scenario) {
+    setPageUrl(scenario.page_url);
+    setExpectedText(scenario.expected_text);
+
+    // Keep old locator fields as-is (optional), but you can also set dummy values
+    // setOldLocatorType("xpath");
+    // setOldLocator("//button[@id='old_locator']");
+
+    // Vision fields
+    setScreenshotPath(scenario.screenshot_path);
+    setTemplatePath(scenario.template_path);
+
+    // For vision-only testing, you can leave rawHtml empty OR keep current rawHtml
+    // If your backend uses DOM after vision to build XPath/CSS, keep HTML present.
+    // We keep current rawHtml to avoid breaking DOM stage.
   }
 
   // ========== Chart data building ==========
+  const { strategyData, scoreData } = useMemo(() => {
+    const strategyCounts = history.reduce((acc, h) => {
+      const st = h.output.element_candidate?.strategy || "none";
+      acc[st] = (acc[st] || 0) + 1;
+      return acc;
+    }, {});
+    const sData = Object.entries(strategyCounts).map(([name, value]) => ({
+      name,
+      value,
+    }));
 
-  const strategyCounts = history.reduce((acc, h) => {
-    const st = h.output.element_candidate?.strategy || "none";
-    acc[st] = (acc[st] || 0) + 1;
-    return acc;
-  }, {});
-  const strategyData = Object.entries(strategyCounts).map(([name, value]) => ({
-    name,
-    value,
-  }));
+    const cData = history
+      .map((h, idx) => {
+        const s = h?.output?.element_candidate?.score;
+        if (s == null) return null;
+        return {
+          index: history.length - idx,
+          score: Number(s.toFixed(3)),
+        };
+      })
+      .filter(Boolean);
+    
+    return { strategyData: sData, scoreData: cData };
 
-  const scoreData = history
-    .map((h, idx) => {
-      const s = h.output.element_candidate?.score;
-      if (s == null) return null;
-      return {
-        index: history.length - idx,
-        score: Number(s.toFixed(3)),
-      };
-    })
-    .filter(Boolean);
+  }, [history]);
 
   // ========== Render ==========
 
   return (
     <div className="page">
       <header className="header">
-        <h1>AI Element Locator – Testing Dashboard</h1>
+        <h1>AI Element Locator – Dashboard</h1>
         <p className="subtitle">
-          AI-Powered Element Locator Engine • Demo &amp; Evaluation
+          AI-Powered Element Locator Engine
         </p>
       </header>
 
@@ -232,8 +302,7 @@ function App() {
             </div>
           </div>
           <div className="metric-note">
-            Values obtained from offline training on synthetic-but-overlapping
-            feature distributions with label noise (RandomForest classifier).
+            RANDOMFOREST CLASSIFIER
           </div>
         </div>
       </section>
@@ -244,13 +313,30 @@ function App() {
           <h2>Test Case Input</h2>
 
           <div className="scenario-row">
-            <span className="label">Predefined Scenarios:</span>
+            <span className="label">Predefined DOM Scenarios:</span>
             <div className="scenario-buttons">
               {PREDEFINED_SCENARIOS.map((s) => (
                 <button
                   key={s.id}
                   className="btn-scenario"
                   onClick={() => applyScenario(s)}
+                  title={s.description}
+                >
+                  {s.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="scenario-row">
+            <span className="label">Predefined Vision Scenarios:</span>
+            <div className="scenario-buttons">
+              {VISION_SCENARIOS.map((s) => (
+                <button
+                  key={s.id}
+                  className="btn-scenario btn-scenario-vision"
+                  onClick={() => applyVisionScenario(s)}
+                  title={s.description}
                 >
                   {s.label}
                 </button>
@@ -295,6 +381,29 @@ function App() {
               onChange={(e) => setOldLocator(e.target.value)}
               placeholder='//button[@id="login_old"]'
             />
+          </div>
+
+          <div className="form-row">
+            <div className="form-group">
+              <label>Screenshot Path (Vision)</label>
+              <input
+                value={screenshotPath}
+                onChange={(e) => setScreenshotPath(e.target.value)}
+                placeholder="data/raw/screenshots/full/login_v1.png"
+              />
+              <small>
+                Use local paths inside your project. Backend reads this file.
+              </small>
+            </div>
+            <div className="form-group">
+              <label>Template Path (Vision)</label>
+              <input
+                value={templatePath}
+                onChange={(e) => setTemplatePath(e.target.value)}
+                placeholder="data/raw/screenshots/templates/login_button.png"
+              />
+              <small>Cropped element image used for template matching.</small>
+            </div>
           </div>
 
           <div className="form-group">
@@ -345,6 +454,14 @@ function App() {
 {`XPath: ${candidate?.xpath ?? "N/A"}
 CSS:   ${candidate?.css ?? "N/A"}`}
                   </pre>
+
+                  <h3>Vision Signals (if used)</h3>
+                  <pre className="code small">
+                    {`vision_match_score: ${extra?.vision_match_score != null ? Number(extra.vision_match_score).toFixed(4) : "N/A"}
+vision_threshold  : ${extra?.vision_threshold != null ? Number(extra.vision_threshold).toFixed(2) : "N/A"}
+vision_template   : ${extra?.vision_template ?? "N/A"}
+vision_screenshot : ${extra?.vision_screenshot ?? "N/A"}`}
+                  </pre>
                 </div>
                 <div>
                   <h3>Element HTML</h3>
@@ -354,10 +471,16 @@ CSS:   ${candidate?.css ?? "N/A"}`}
                 </div>
               </div>
 
-              <h3>Raw JSON Report</h3>
-              <pre className="code small">
-                {JSON.stringify(currentReport, null, 2)}
-              </pre>
+              <details style={{ marginTop: 10 }}>
+                <summary
+                  style={{ cursor: "pointer", fontWeight: 700, opacity: 0.9 }}
+                >
+                  Raw JSON Report
+                </summary>
+                <pre className="code small">
+                  {JSON.stringify(currentReport, null, 2)}
+                </pre>
+              </details>
             </>
           )}
 
@@ -366,7 +489,9 @@ CSS:   ${candidate?.css ?? "N/A"}`}
             <div className="chart-card">
               <h3>Strategy Usage</h3>
               {strategyData.length === 0 ? (
-                <p className="chart-placeholder">Run some tests to see chart.</p>
+                <p className="chart-placeholder">
+                  Run some tests to see chart.
+                </p>
               ) : (
                 <ResponsiveContainer width="100%" height={220}>
                   <PieChart>
@@ -394,7 +519,9 @@ CSS:   ${candidate?.css ?? "N/A"}`}
             <div className="chart-card">
               <h3>Confidence Scores (Recent Runs)</h3>
               {scoreData.length === 0 ? (
-                <p className="chart-placeholder">Run some tests to see chart.</p>
+                <p className="chart-placeholder">
+                  Run some tests to see chart.
+                </p>
               ) : (
                 <ResponsiveContainer width="100%" height={220}>
                   <BarChart data={scoreData}>
@@ -423,20 +550,28 @@ CSS:   ${candidate?.css ?? "N/A"}`}
                 <th>Old Locator</th>
                 <th>Strategy</th>
                 <th>Score</th>
+                <th>Vision</th>
               </tr>
             </thead>
             <tbody>
               {history.map((h, idx) => {
                 const c = h.output.element_candidate;
+                const ex = c?.extra ?? {};
+                const visionShown =
+                  ex?.vision_match_score != null
+                    ? `${Number(ex.vision_match_score).toFixed(3)} / thr ${ex?.vision_threshold != null ? Number(ex.vision_threshold).toFixed(2) : "?"}`
+                    : "-";
+
                 return (
                   <tr key={h.id}>
                     <td>{history.length - idx}</td>
                     <td>{h.input.expected_text}</td>
-                    <td className="mono">{h.input.old_locator}</td>
+                    <td className="mono">{h?.input?.old_locator ?? "-"}</td>
                     <td>{c?.strategy ?? "-"}</td>
                     <td>
                       {c?.score != null ? Number(c.score).toFixed(3) : "-"}
                     </td>
+                    <td className="mono">{visionShown}</td>
                   </tr>
                 );
               })}
