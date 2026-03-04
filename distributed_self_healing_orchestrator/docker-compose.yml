@@ -76,8 +76,8 @@ services:
 
   ai_element_locator:
     build:
-      context: ..
-      dockerfile: ai_element_locator_engine/Dockerfile
+      context: ../ai_element_locator_engine
+      dockerfile: Dockerfile
     container_name: ominifix_locator
     ports:
       - "8001:8001"

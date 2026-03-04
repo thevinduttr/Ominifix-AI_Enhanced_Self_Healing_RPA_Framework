@@ -3,14 +3,14 @@ FROM python:3.12-slim
 WORKDIR /app
 
 # Copy requirements first for better caching
-COPY ai_element_locator_engine/requirements.txt .
+COPY requirements.txt .
 
 # Install dependencies
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy application code
-COPY ai_element_locator_engine/app ./app
-COPY ai_element_locator_engine/data ./data
+COPY app ./app
+COPY data ./data
 
 # Expose port
 EXPOSE 8001

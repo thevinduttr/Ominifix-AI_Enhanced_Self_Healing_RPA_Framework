@@ -9,5 +9,5 @@ numpy
 scikit-learn
 pydantic-settings
 joblib
-opencv-python
+opencv-python-headless
 playwright

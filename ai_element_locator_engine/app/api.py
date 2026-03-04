@@ -47,6 +47,16 @@ app.add_middleware(
 locator_engine = ElementLocatorEngine()
 
 
+@app.get("/", tags=["system"])
+def root() -> dict:
+    return {
+        "status": "ok",
+        "service": settings.SERVICE_NAME,
+        "health": "/health",
+        "docs": "/docs",
+    }
+
+
 @app.get("/health", tags=["system"])
 def health_check() -> dict:
     """

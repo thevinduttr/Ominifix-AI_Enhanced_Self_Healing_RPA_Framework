@@ -8,3 +8,4 @@ sqlalchemy
 playwright
 selenium 
 webdriver-manager
+jinja2
