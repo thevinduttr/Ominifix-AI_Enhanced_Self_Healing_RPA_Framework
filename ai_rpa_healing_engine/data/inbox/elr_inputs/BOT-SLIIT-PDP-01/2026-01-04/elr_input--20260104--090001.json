@@ -1,0 +1,27 @@
+{
+  "metadata": {
+    "report_id": "ELR-SLIIT-001",
+    "run_id": "RUN-PP1-INT-01",
+    "bot_id": "BOT-SLIIT-PDP-01",
+    "timestamp": "2026-01-04T09:15:00",
+    "source_component": "element_locator_engine",
+    "target_component": "code_healing_engine"
+  },
+  "failure_context": {
+    "script_path": "E:/RESEARCH/Ominifix-AI_Enhanced_Self_Healing_RPA_Framework/rpa_systems/sliit_pdp_rpa/src/extract/pdp_scraper.py",
+    "failing_line": 31,
+    "action": "wait_for_selector",
+    "old_locator": "ul.nav.hr-tab-nav[role='tablist']",
+    "error_type": "TIMEOUT_WAITING_FOR_SELECTOR",
+    "error_message": "Timeout waiting for selector ul.nav.hr-tab-nav[role='tablist']"
+  },
+  "dom_context": {
+    "page_url": "https://www.sliit.lk/professional-programmes/",
+    "page_name": "SLIIT Professional Programmes",
+    "new_element_html": "<ul class=\"nav hr-tabs-nav nav-alignment--left clearfix\" role=\"tablist\">...</ul>"
+  },
+  "element_expectation": {
+    "expected_role": "tablist",
+    "expected_text": "Online Programs"
+  }
+}

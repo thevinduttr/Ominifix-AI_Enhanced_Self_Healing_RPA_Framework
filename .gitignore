@@ -38,6 +38,7 @@ models/*.onnx
 # Data (Generated / Runtime)
 # ===============================
 data/logs/
+data/inbox/
 data/dom_snapshots/
 data/synthetic_outputs/
 data/scripts/healed/
@@ -83,3 +84,4 @@ Thumbs.db
 # Kaggle
 # ===============================
 kaggle.json
+*.json
