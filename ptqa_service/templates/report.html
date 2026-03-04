@@ -1,0 +1,51 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>PTQA Report - {{ healing_id }}</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+
+<body class="bg-slate-50">
+  <div class="max-w-5xl mx-auto p-6">
+    <div class="flex items-center justify-between">
+      <div>
+        <h1 class="text-2xl font-bold">PTQA Report</h1>
+        <p class="text-slate-600 mt-1 font-mono">{{ healing_id }}</p>
+      </div>
+      <a href="/dashboard" class="underline text-sm">Back to dashboard</a>
+    </div>
+
+    <div class="bg-white rounded-xl shadow p-4 mt-6">
+      {% if row %}
+        <div class="grid grid-cols-3 gap-3">
+          <div class="p-3 rounded bg-slate-100">
+            <div class="text-xs text-slate-500">Recommendation</div>
+            <div class="text-lg font-bold">{{ row.recommendation }}</div>
+          </div>
+          <div class="p-3 rounded bg-slate-100">
+            <div class="text-xs text-slate-500">Risk</div>
+            <div class="text-lg font-bold">{{ row.risk_level }}</div>
+          </div>
+          <div class="p-3 rounded bg-slate-100">
+            <div class="text-xs text-slate-500">Confidence</div>
+            <div class="text-lg font-bold">{{ "%.3f"|format(row.confidence or 0) }}</div>
+          </div>
+        </div>
+
+        <div class="mt-4">
+          <h2 class="font-semibold">Reasons</h2>
+          <pre class="mt-2 bg-slate-900 text-slate-100 p-3 rounded text-xs overflow-auto">{{ row.reasons }}</pre>
+        </div>
+
+        <div class="mt-4">
+          <h2 class="font-semibold">Raw Payload</h2>
+          <pre class="mt-2 bg-slate-900 text-slate-100 p-3 rounded text-xs overflow-auto">{{ row.raw_payload }}</pre>
+        </div>
+      {% else %}
+        <div class="text-red-700">No report found in SQLite for healing_id={{ healing_id }}</div>
+      {% endif %}
+    </div>
+  </div>
+</body>
+</html>

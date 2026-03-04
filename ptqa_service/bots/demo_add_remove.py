@@ -1,27 +1,25 @@
-from playwright.sync_api import sync_playwright
+from __future__ import annotations
+
+from typing import Any, Dict
+
+from bots._pw_utils import run_playwright_flow
 
 
-def run_main_flow():
-    """
-    Demo 1:
-    Simple element add/remove test.
-    Shows DOM clicking and assertion.
-    """
+def run_main_flow(context: Dict[str, Any] | None = None) -> Dict[str, Any]:
+    context = context or {}
 
-    with sync_playwright() as p:
-        browser = p.chromium.launch(headless=True)
-        page = browser.new_page()
+    def flow(page):
+        page.goto("https://the-internet.herokuapp.com/add_remove_elements/", wait_until="domcontentloaded")
 
-        page.goto("https://the-internet.herokuapp.com/add_remove_elements/", wait_until="networkidle")
+        page.get_by_text("Add Element", exact=True).click()
 
-        # Add element
-        page.click("text=Add Element")
+        delete_btn = page.locator("button.added-manually")
+        delete_btn.wait_for(state="visible", timeout=8000)
+        assert delete_btn.count() >= 1, "Delete button should appear"
 
-        delete_button = page.locator("button.added-manually")
-        assert delete_button.count() > 0, "Delete button should appear"
+        delete_btn.first.click()
+        # After delete, there should be 0 buttons
+        page.wait_for_timeout(300)  # small UI settle
+        assert page.locator("button.added-manually").count() == 0, "Delete button should disappear"
 
-        # Remove it
-        delete_button.first.click()
-
-        browser.close()
-        return True
+    return run_playwright_flow(context, "add_remove", flow)

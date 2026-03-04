@@ -6,12 +6,18 @@ from app.api.routes_healing import router as healing_router
 from app.api.routes_ci import router as ci_router
 from app.api.routes_reports import router as reports_router
 from app.db.session import init_db
+from app.web.routes_dashboard import router as dashboard_router
+
+import webbrowser
+import threading
 
 app = FastAPI(
     title="PTQA Service",
     description="Predictive Testing & Quality Assessment Microservice",
     version="1.0.0",
 )
+
+app.include_router(dashboard_router)
 
 # Optional but safe: allow CORS (handy if you later open UI from other origins)
 app.add_middleware(
@@ -26,6 +32,11 @@ app.add_middleware(
 @app.on_event("startup")
 def on_startup():
     init_db()
+
+    def open_browser():
+        webbrowser.open("http://127.0.0.1:8000/dashboard")
+
+    threading.Timer(1.5, open_browser).start()
 
 
 @app.get("/")

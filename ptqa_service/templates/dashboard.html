@@ -1,0 +1,394 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>PTQA Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+  </head>
+
+  <body class="bg-slate-50">
+    <div class="max-w-7xl mx-auto p-6">
+      <div class="flex items-center justify-between">
+        <div>
+          <h1 class="text-3xl font-bold">PTQA Dashboard</h1>
+          <p class="text-slate-600 mt-1">
+            Predictive Testing and Quality Assessment console with Before vs
+            After validation.
+          </p>
+        </div>
+        <div class="text-sm text-slate-500">
+          <a class="underline" href="/docs">API Docs</a>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-12 gap-6 mt-6">
+        <!-- Left: Input -->
+        <div class="col-span-6 bg-white rounded-xl shadow p-4">
+          <div class="flex items-center justify-between">
+            <h2 class="text-lg font-semibold">Healing Payload</h2>
+
+            <div class="flex gap-2">
+              <button
+                class="px-3 py-1 rounded bg-slate-200 hover:bg-slate-300 text-sm"
+                onclick="loadPreset('login')"
+              >
+                Preset: Login
+              </button>
+              <button
+                class="px-3 py-1 rounded bg-slate-200 hover:bg-slate-300 text-sm"
+                onclick="loadPreset('addremove')"
+              >
+                Preset: Add/Remove
+              </button>
+              <button
+                class="px-3 py-1 rounded bg-slate-200 hover:bg-slate-300 text-sm"
+                onclick="loadPreset('dynamic')"
+              >
+                Preset: Dynamic
+              </button>
+              <button
+                class="px-3 py-1 rounded bg-slate-200 hover:bg-slate-300 text-sm"
+                onclick="loadPreset('orange')"
+              >
+                Preset: OrangeHRM
+              </button>
+            </div>
+          </div>
+
+          <div class="mt-3">
+            <label class="text-sm text-slate-600">Payload JSON</label>
+            <textarea
+              id="payload"
+              class="w-full mt-1 h-80 font-mono text-sm border rounded p-2"
+            ></textarea>
+          </div>
+
+          <div class="mt-3 flex items-center justify-between">
+            <div class="flex items-center gap-2">
+              <input id="headlessToggle" type="checkbox" checked />
+              <label for="headlessToggle" class="text-sm text-slate-700"
+                >Headless mode</label
+              >
+            </div>
+
+            <button
+              onclick="evaluateHealing()"
+              class="px-4 py-2 rounded bg-blue-600 hover:bg-blue-700 text-white font-medium"
+            >
+              Evaluate Healing
+            </button>
+          </div>
+
+          <div
+            id="errorBox"
+            class="hidden mt-3 p-3 rounded bg-red-50 text-red-700 text-sm"
+          ></div>
+        </div>
+
+        <!-- Right: Results -->
+        <div class="col-span-6 bg-white rounded-xl shadow p-4">
+          <h2 class="text-lg font-semibold">Result</h2>
+
+          <div class="mt-3 grid grid-cols-3 gap-3">
+            <div class="p-3 rounded bg-slate-100">
+              <div class="text-xs text-slate-500">Recommendation</div>
+              <div id="recommendation" class="text-base font-bold">-</div>
+            </div>
+            <div class="p-3 rounded bg-slate-100">
+              <div class="text-xs text-slate-500">Risk Level</div>
+              <div id="riskLevel" class="text-base font-bold">-</div>
+            </div>
+            <div class="p-3 rounded bg-slate-100">
+              <div class="text-xs text-slate-500">Will Work Prob.</div>
+              <div id="willWork" class="text-base font-bold">-</div>
+            </div>
+          </div>
+
+          <div class="mt-4">
+            <h3 class="font-semibold">Metrics (Before vs After)</h3>
+            <div class="grid grid-cols-2 gap-3 mt-2 text-sm">
+              <div class="p-3 rounded border">
+                <div class="text-slate-500 text-xs">
+                  Pass Rate (Before → After)
+                </div>
+                <div id="passRate" class="font-mono">-</div>
+              </div>
+              <div class="p-3 rounded border">
+                <div class="text-slate-500 text-xs">
+                  Avg Time (Before → After)
+                </div>
+                <div id="avgTime" class="font-mono">-</div>
+              </div>
+              <div class="p-3 rounded border">
+                <div class="text-slate-500 text-xs">Pass Rate Delta</div>
+                <div id="passDelta" class="font-mono">-</div>
+              </div>
+              <div class="p-3 rounded border">
+                <div class="text-slate-500 text-xs">Latency Delta</div>
+                <div id="latDelta" class="font-mono">-</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="mt-4">
+            <h3 class="font-semibold">Raw Response</h3>
+            <pre
+              id="raw"
+              class="mt-2 bg-slate-900 text-slate-100 p-3 rounded text-xs overflow-auto h-56"
+            ></pre>
+          </div>
+        </div>
+      </div>
+
+      <!-- History -->
+      <div class="bg-white rounded-xl shadow p-4 mt-6">
+        <div class="flex items-center justify-between">
+          <h2 class="text-lg font-semibold">Past Evaluations (SQLite)</h2>
+
+          <div class="flex items-center gap-2">
+            <button
+              onclick="location.reload()"
+              class="px-3 py-1 rounded bg-slate-200 hover:bg-slate-300 text-sm"
+            >
+              Refresh
+            </button>
+
+            <button
+              onclick="deleteAllRuns()"
+              class="px-3 py-1 rounded bg-red-100 hover:bg-red-200 text-sm text-red-700"
+            >
+              Delete All
+            </button>
+          </div>
+        </div>
+
+        <div class="overflow-auto mt-3">
+          <table class="w-full text-sm">
+            <thead>
+              <tr class="text-left text-slate-600 border-b">
+                <th class="py-2">Healing ID</th>
+                <th>Script</th>
+                <th>Env</th>
+                <th>Risk</th>
+                <th>Recommendation</th>
+                <th>Confidence</th>
+                <th></th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for r in runs %}
+              <tr class="border-b">
+                <td class="py-2 font-mono">{{ r.healing_id }}</td>
+                <td>{{ r.script_id }}</td>
+                <td>{{ r.environment }}</td>
+                <td>{{ r.risk_level }}</td>
+                <td class="font-semibold">{{ r.recommendation }}</td>
+                <td>{{ "%.3f"|format(r.confidence or 0) }}</td>
+                <td class="text-right">
+                  <a
+                    class="underline"
+                    href="/dashboard/report/{{ r.healing_id }}"
+                    >View</a
+                  >
+                </td>
+                <td class="text-right">
+                  <button
+                    class="underline text-red-600"
+                    onclick="deleteRun('{{ r.healing_id }}')"
+                  >
+                    Delete
+                  </button>
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      const presets = {
+        login: {
+          metadata: {
+            healing_id: "H_LOGIN_001",
+            script_id: "BOT_LOGIN",
+            environment: "prod",
+            last_n_failures: 3,
+          },
+          healing_summary: {
+            status: "success",
+            old_locator: "//*[@id='username-old']",
+            new_locator: "//*[@id='username']",
+            strategy_used: "visual-ocr",
+          },
+          model_info: { model_confidence: 0.62 },
+          script_output: {
+            original_script_path: "bots/login_bot.py",
+            healed_script_path: "bots/login_bot_healed.py",
+          },
+        },
+        addremove: {
+          metadata: {
+            healing_id: "H_ADDREM_001",
+            script_id: "BOT_ADD_REMOVE",
+            environment: "qa",
+            last_n_failures: 1,
+          },
+          healing_summary: {
+            status: "success",
+            old_locator: "text=Add Element OLD",
+            new_locator: "text=Add Element",
+            strategy_used: "dom",
+          },
+          model_info: { model_confidence: 0.75 },
+          script_output: {
+            original_script_path: "bots/demo_add_remove_original.py",
+            healed_script_path: "bots/demo_add_remove.py",
+          },
+        },
+        dynamic: {
+          metadata: {
+            healing_id: "H_DYN_001",
+            script_id: "BOT_DYNAMIC",
+            environment: "qa",
+            last_n_failures: 2,
+          },
+          healing_summary: {
+            status: "success",
+            old_locator: "text=Hello OLD",
+            new_locator: "text=Hello World!",
+            strategy_used: "dom",
+          },
+          model_info: { model_confidence: 0.71 },
+          script_output: {
+            original_script_path: "bots/demo_dynamic_original.py",
+            healed_script_path: "bots/demo_dynamic_loading.py",
+          },
+        },
+        orange: {
+          metadata: {
+            healing_id: "H_ORANGE_001",
+            script_id: "BOT_ORANGEHRM",
+            environment: "prod",
+            last_n_failures: 4,
+          },
+          healing_summary: {
+            status: "success",
+            old_locator: "input[name='user']",
+            new_locator: "input[name='username']",
+            strategy_used: "dom",
+          },
+          model_info: { model_confidence: 0.7 },
+          script_output: {
+            original_script_path: "bots/demo_orange_original.py",
+            healed_script_path: "bots/demo_login_orangehrm.py",
+          },
+        },
+      };
+
+      function loadPreset(key) {
+        document.getElementById("payload").value = JSON.stringify(
+          presets[key],
+          null,
+          2,
+        );
+      }
+
+      loadPreset("login");
+
+      async function evaluateHealing() {
+        const err = document.getElementById("errorBox");
+        err.classList.add("hidden");
+        err.innerText = "";
+
+        let payload;
+        try {
+          payload = JSON.parse(document.getElementById("payload").value);
+        } catch (e) {
+          err.innerText = "Payload is not valid JSON.";
+          err.classList.remove("hidden");
+          return;
+        }
+
+        // Apply headless toggle into metadata so bots can read it
+        payload.metadata = payload.metadata || {};
+        payload.metadata.headless =
+          document.getElementById("headlessToggle").checked;
+
+        const res = await fetch("/ptqa/evaluate-healing", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+
+        const text = await res.text();
+        let data;
+        try {
+          data = JSON.parse(text);
+        } catch (e) {
+          err.innerText = text;
+          err.classList.remove("hidden");
+          return;
+        }
+
+        document.getElementById("raw").innerText = JSON.stringify(
+          data,
+          null,
+          2,
+        );
+
+        document.getElementById("recommendation").innerText =
+          data.recommendation || "-";
+        document.getElementById("riskLevel").innerText = data.risk_level || "-";
+        document.getElementById("willWork").innerText =
+          data.will_work_probability ?? "-";
+
+        const m = data.quality_metrics || {};
+        const prB = m.pass_rate_before ?? "-";
+        const prA = m.pass_rate_after ?? "-";
+        const tB = m.avg_time_before ?? "-";
+        const tA = m.avg_time_after ?? "-";
+
+        document.getElementById("passRate").innerText = `${prB} → ${prA}`;
+        document.getElementById("avgTime").innerText = `${tB} → ${tA}`;
+        document.getElementById("passDelta").innerText =
+          m.pass_rate_delta ?? "-";
+        document.getElementById("latDelta").innerText = m.latency_delta ?? "-";
+      }
+
+      async function deleteRun(healingId) {
+        const ok = confirm(`Delete ${healingId}? This cannot be undone.`);
+        if (!ok) return;
+
+        const res = await fetch(
+          `/dashboard/delete/${encodeURIComponent(healingId)}`,
+          {
+            method: "DELETE",
+          },
+        );
+
+        if (!res.ok) {
+          const txt = await res.text();
+          alert("Delete failed: " + txt);
+          return;
+        }
+
+        location.reload();
+      }
+
+      async function deleteAllRuns() {
+        const ok = confirm("Delete ALL runs? This cannot be undone.");
+        if (!ok) return;
+
+        const res = await fetch(`/dashboard/delete-all`, { method: "DELETE" });
+        if (!res.ok) {
+          alert("Delete all failed: " + (await res.text()));
+          return;
+        }
+        location.reload();
+      }
+    </script>
+  </body>
+</html>

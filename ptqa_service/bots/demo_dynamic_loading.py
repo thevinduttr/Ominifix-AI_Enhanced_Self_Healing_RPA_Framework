@@ -1,23 +1,22 @@
-from playwright.sync_api import sync_playwright
+from __future__ import annotations
+
+from typing import Any, Dict
+
+from bots._pw_utils import run_playwright_flow
 
 
-def run_main_flow():
-    """
-    Demo 3:
-    Demonstrates handling of dynamic content and waits.
-    """
+def run_main_flow(context: Dict[str, Any] | None = None) -> Dict[str, Any]:
+    context = context or {}
 
-    with sync_playwright() as p:
-        browser = p.chromium.launch(headless=True)
-        page = browser.new_page()
+    def flow(page):
+        page.goto("https://the-internet.herokuapp.com/dynamic_loading/2", wait_until="domcontentloaded")
 
-        page.goto("https://the-internet.herokuapp.com/dynamic_loading/2", wait_until="networkidle")
+        page.get_by_text("Start", exact=True).click()
 
-        # Start loading
-        page.click("text=Start")
+        # Wait for success text
+        page.get_by_text("Hello World!", exact=True).wait_for(timeout=12000)
 
-        # Wait for content to appear
-        page.wait_for_selector("text=Hello World!", timeout=10000)
+        # Assert visible
+        assert page.get_by_text("Hello World!", exact=True).is_visible()
 
-        browser.close()
-        return True
+    return run_playwright_flow(context, "dynamic_loading", flow)

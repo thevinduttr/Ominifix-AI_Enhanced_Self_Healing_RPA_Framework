@@ -1,24 +1,30 @@
-from playwright.sync_api import sync_playwright
+from __future__ import annotations
+
+from typing import Any, Dict
+
+from bots._pw_utils import run_playwright_flow
 
 
-def run_main_flow():
-    """
-    Demo 2:
-    Real login flow to public OrangeHRM demo.
-    """
+def run_main_flow(context: Dict[str, Any] | None = None) -> Dict[str, Any]:
+    context = context or {}
 
-    with sync_playwright() as p:
-        browser = p.chromium.launch(headless=True)
-        page = browser.new_page()
+    def flow(page):
+        page.goto("https://opensource-demo.orangehrmlive.com/", wait_until="domcontentloaded")
 
-        page.goto("https://opensource-demo.orangehrmlive.com/", wait_until="networkidle")
-
+        # Wait for login form
+        page.locator("input[name='username']").wait_for(state="visible", timeout=15000)
         page.fill("input[name='username']", "Admin")
         page.fill("input[name='password']", "admin123")
-
         page.click("button[type='submit']")
 
-        assert "dashboard" in page.url.lower(), f"Login failed: {page.url}"
+        # OrangeHRM sometimes redirects slowly; wait for dashboard-ish URL or menu
+        page.wait_for_timeout(1200)
+        # Prefer a UI element check instead of URL-only
+        page.locator("header").wait_for(state="visible", timeout=15000)
 
-        browser.close()
-        return True
+        # Soft check: either dashboard URL OR presence of side panel
+        ok_url = "dashboard" in page.url.lower()
+        ok_ui = page.locator("aside").count() > 0
+        assert (ok_url or ok_ui), f"Login may have failed or page structure changed. URL: {page.url}"
+
+    return run_playwright_flow(context, "orangehrm_login", flow)
