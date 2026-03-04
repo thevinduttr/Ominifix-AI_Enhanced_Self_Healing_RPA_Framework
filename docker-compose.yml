@@ -36,8 +36,7 @@ services:
     ports:
       - "8000:8000"
     environment:
-      MODEL_URL: https://rpa-error-classifier-555972249634.us-central1.run.app/predict  # Deployed cloud model
-      #MODEL_URL: http://host.docker.internal:8090/classify --- IGNORE ---  # Local model server (for testing)
+      MODEL_URL: https://rpa-error-classifier-555972249634.us-central1.run.app/predict
       RABBIT_HOST: rabbitmq
     depends_on:
       rabbitmq:
@@ -86,6 +85,18 @@ services:
       - "8001:8001"
     depends_on:
       - rabbitmq
+
+  ai_element_locator_dashboard:
+    build:
+      context: ./ai_element_locator_engine/locator-dashboard
+      dockerfile: Dockerfile
+    environment:
+      - VITE_API_BASE_URL=http://localhost:8001
+    ports:
+      - "5173:5173"
+    depends_on:
+      - ai_element_locator
+    restart: unless-stopped
 
   ai_rpa_healing_engine:
     build:

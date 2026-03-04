@@ -4,6 +4,10 @@ import os
 import requests
 from mq import publish_failure_event
 
+DEFAULT_MODEL_URL = "https://rpa-error-classifier-555972249634.us-central1.run.app/predict"
+MODEL_READ_TIMEOUT_SECONDS = float(os.environ.get("MODEL_READ_TIMEOUT_SECONDS", "20"))
+MODEL_MAX_RETRIES = int(os.environ.get("MODEL_MAX_RETRIES", "2"))
+
 # Current known bots and recent failures
 bots = {}
 failures = []  # list of failure dicts with details
@@ -84,15 +88,14 @@ def process_failure(data):
         pass
 
     # kick off async classification using external model if configured
-    #model_url = os.environ.get('MODEL_URL') or 'http://localhost:8090/predict'  # default to local model for testing
-    model_url = os.environ.get('MODEL_URL') or 'https://rpa-error-classifier-555972249634.us-central1.run.app/predict'
+    model_url = os.environ.get('MODEL_URL') or DEFAULT_MODEL_URL
     if model_url:
         try:
             threading.Thread(target=_classify_failure, args=(model_url, failure), daemon=True).start()
             # optimistically set category to 'pending'
             failure['category'] = 'pending'
         except Exception:
-            failure['category'] = 'unknowng'
+            failure['category'] = 'unknown'
 
     return {'status': 'recorded'}
 
@@ -102,6 +105,8 @@ def _classify_failure(model_url, failure):
     This runs in a background thread and updates the shared failures/bots structures in-place.
     The model expects: error_message, retry_count, exec_time_ms, ui_change_score, network_latency
     """
+    cat = 'unknown'
+    confidence = None
     try:
         # Extract metadata for your model's expected format
         metadata = failure.get('metadata') or {}
@@ -116,7 +121,25 @@ def _classify_failure(model_url, failure):
             'network_latency': metadata.get('network_latency', 100)  # default 100ms
         }
         print(f"[classifier] POST {model_url} payload={payload}")
-        resp = requests.post(model_url, json=payload, timeout=5)
+        resp = None
+        last_error = None
+        for attempt in range(1, MODEL_MAX_RETRIES + 1):
+            try:
+                resp = requests.post(
+                    model_url,
+                    json=payload,
+                    timeout=(5, MODEL_READ_TIMEOUT_SECONDS),
+                )
+                break
+            except requests.RequestException as e:
+                last_error = e
+                print(f"[classifier] attempt {attempt}/{MODEL_MAX_RETRIES} failed: {e}")
+                if attempt < MODEL_MAX_RETRIES:
+                    time.sleep(attempt)
+
+        if resp is None:
+            raise requests.RequestException(last_error or "No response from model server")
+
         status = getattr(resp, 'status_code', None)
         try:
             body = resp.text
@@ -124,7 +147,6 @@ def _classify_failure(model_url, failure):
             body = '<no-body>'
         print(f"[classifier] response status={status} body={body}")
 
-        confidence = None
         if resp.ok:
             try:
                 j = resp.json()
@@ -134,7 +156,7 @@ def _classify_failure(model_url, failure):
             if j is None:
                 cat = 'unknown'
             else:
-                # prefer common keys - support error_class_name for user's custom model
+                # prefer common keys - support cloud model response shape
                 cat = j.get('category') or j.get('label') or j.get('prediction') or j.get('error_class_name')
                 if not cat:
                     # some models return a top-level result

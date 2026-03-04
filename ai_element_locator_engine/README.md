@@ -271,8 +271,17 @@ Supports DOM-only, vision-only, and hybrid execution modes.
 1. Navigate to `locator-dashboard`  
 2. Run:
       npm install
+  # optional: if backend runs on a non-default port
+  # set VITE_API_BASE_URL (default is http://127.0.0.1:8001)
       npm run dev
 3. Open:http://localhost:5173
+
+If your backend is started with `uvicorn app.api:app --reload` on port `8000`, run:
+
+```
+set VITE_API_BASE_URL=http://127.0.0.1:8000
+npm run dev
+```
 
 
 ---

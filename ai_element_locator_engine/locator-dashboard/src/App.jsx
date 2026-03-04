@@ -12,7 +12,8 @@ import {
   Legend,
 } from "recharts";
 
-const API_BASE = "http://127.0.0.1:8000";
+const API_BASE =
+  import.meta.env.VITE_API_BASE_URL?.trim() || "http://127.0.0.1:8001";
 const HISTORY_KEY = "locator_dashboard_history";
 
 // Fixed metrics from your latest training run
