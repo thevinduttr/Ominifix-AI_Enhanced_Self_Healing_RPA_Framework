@@ -36,7 +36,8 @@ services:
     ports:
       - "8000:8000"
     environment:
-      MODEL_URL: http://host.docker.internal:8090/predict  # Your deployed model
+      MODEL_URL: https://rpa-error-classifier-555972249634.us-central1.run.app/predict  # Deployed cloud model
+      #MODEL_URL: http://host.docker.internal:8090/classify --- IGNORE ---  # Local model server (for testing)
       RABBIT_HOST: rabbitmq
     depends_on:
       rabbitmq:
@@ -96,19 +97,21 @@ services:
     depends_on:
       - orchestrator_monitor
 
-  # sliit_pdp_rpa_bot:
-  #   build:
-  #     context: ./sliit_pdp_rpa
-  #     dockerfile: Dockerfile
-  #   environment:
-  #     - PYTHONUNBUFFERED=1
-  #   volumes:
-  #     - ./sliit_pdp_rpa/outputs:/app/outputs
-  #     - ./sliit_pdp_rpa/logs:/app/logs
-  #   depends_on:
-  #     - orchestrator_monitor
-  #     - ai_element_locator
-  #   restart: unless-stopped
+  sliit_pdp_rpa_bot:
+    build:
+      context: ./sliit_pdp_rpa
+      dockerfile: Dockerfile
+    environment:
+      - PYTHONUNBUFFERED=1
+      - ORCHESTRATOR_URL=http://orchestrator_monitor:8000
+      - ORCHESTRATOR_ENABLED=true
+    volumes:
+      - ./sliit_pdp_rpa/outputs:/app/sliit_pdp_rpa/outputs
+      - ./sliit_pdp_rpa/logs:/app/sliit_pdp_rpa/logs
+    depends_on:
+      - orchestrator_monitor
+      - ai_element_locator
+    restart: unless-stopped
 
 volumes:
   rabbitmq_data:

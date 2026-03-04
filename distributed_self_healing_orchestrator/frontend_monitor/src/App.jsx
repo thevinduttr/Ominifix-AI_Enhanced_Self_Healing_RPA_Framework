@@ -15,6 +15,7 @@ function App() {
   const audioCtxRef = useRef(null)
   const audioUnlockedRef = useRef(false)
   const audioHintShownRef = useRef(false)
+  const pendingAlertsRef = useRef([])
 
   const getSoundProfile = (failure) => {
     const rawType =
@@ -26,65 +27,59 @@ function App() {
       return { label: 'network', tones: [600, 520], durationMs: 180 }
     }
 
-    if (
-      rawType.includes('selector') ||
-      rawType.includes('locator') ||
-      rawType.includes('element') ||
-      rawType.includes('not found')
-    ) {
-      return { label: 'ui', tones: [880, 1200], durationMs: 140 }
-    }
-
-    if (rawType.includes('assert') || rawType.includes('validation')) {
-      return { label: 'assert', tones: [740, 740], durationMs: 120 }
-    }
-
-    return { label: 'generic', tones: [880], durationMs: 200 }
+    return { label: 'other', tones: [900, 900], durationMs: 120 }
   }
 
   const playAlertSound = (failure) => {
     try {
       if (!audioUnlockedRef.current || !audioCtxRef.current) {
+        pendingAlertsRef.current.push(failure)
         if (!audioHintShownRef.current) {
           audioHintShownRef.current = true
           showSnackbar('Click anywhere to enable sound alerts', 'generic')
         }
-        return
+        return false
       }
 
       const ctx = audioCtxRef.current
+      if (ctx.state !== 'running') {
+        return false
+      }
 
       const profile = getSoundProfile(failure)
-      const oscillator = ctx.createOscillator()
-      const gain = ctx.createGain()
-
-      oscillator.type = 'sine'
-      gain.gain.value = 0.04
-
-      oscillator.connect(gain)
-      gain.connect(ctx.destination)
-
       const now = ctx.currentTime
       const duration = profile.durationMs / 1000
       profile.tones.forEach((freq, idx) => {
+        const oscillator = ctx.createOscillator()
+        const gain = ctx.createGain()
         const t = now + idx * duration
-        oscillator.frequency.setValueAtTime(freq, t)
-      })
 
-      oscillator.start()
-      oscillator.stop(now + profile.tones.length * duration)
+        oscillator.type = 'square'
+        oscillator.frequency.setValueAtTime(freq, t)
+
+        gain.gain.setValueAtTime(0.0001, t)
+        gain.gain.exponentialRampToValueAtTime(0.12, t + 0.02)
+        gain.gain.exponentialRampToValueAtTime(0.0001, t + duration)
+
+        oscillator.connect(gain)
+        gain.connect(ctx.destination)
+
+        oscillator.start(t)
+        oscillator.stop(t + duration)
+      })
+      return true
 
     } catch (err) {
       console.warn('Audio alert blocked or unavailable:', err)
+      return false
     }
   }
 
   const unlockAudio = () => {
-    if (audioUnlockedRef.current) return
     try {
       const AudioContext = window.AudioContext || window.webkitAudioContext
       if (!AudioContext) return
-      const ctx = new AudioContext()
+      const ctx = audioCtxRef.current || new AudioContext()
       audioCtxRef.current = ctx
       const resumeResult = ctx.resume()
       if (resumeResult && typeof resumeResult.then === 'function') {
@@ -92,6 +87,12 @@ function App() {
           .then(() => {
             if (ctx.state === 'running') {
               audioUnlockedRef.current = true
+              if (pendingAlertsRef.current.length > 0) {
+                const queued = [...pendingAlertsRef.current]
+                pendingAlertsRef.current = []
+                queued.forEach((failure) => playAlertSound(failure))
+              }
+              showSnackbar('Sound alerts enabled', 'generic')
             }
           })
           .catch(() => {
@@ -124,6 +125,27 @@ function App() {
     return previousCategory !== category
   }
 
+  const processClassificationAlerts = (nextFailures) => {
+    const chronological = [...nextFailures].reverse()
+
+    chronological.forEach((failure) => {
+      const key = getFailureKey(failure)
+      const currentCategory = failure.category || failure.failure_type
+      const previousCategory = playedRef.current[key]
+
+      if (shouldPlayForFailure(failure, previousCategory)) {
+        playAlertSound(failure)
+        const label = currentCategory || 'Unknown'
+        const message = failure.error || failure.error_message || 'Failure detected'
+        const variant = getSoundProfile(failure).label
+        showSnackbar(`Failure detected · ${label}: ${message}`, variant)
+      }
+
+      playedRef.current[key] = currentCategory
+      seenRef.current[key] = true
+    })
+  }
+
   const loadStatus = async () => {
     try {
       const data = await fetchBotStatus()
@@ -132,23 +154,8 @@ function App() {
       setFailures(nextFailures)
       setLastUpdate(new Date().toLocaleString())
 
-      const latest = nextFailures[0]
-      if (latest) {
-        const key = getFailureKey(latest)
-        const previousCategory = playedRef.current[key]
-        if (shouldPlayForFailure(latest, previousCategory)) {
-          playAlertSound(latest)
-        }
-        playedRef.current[key] = latest.category || latest.failure_type
-
-        if (!seenRef.current[key]) {
-          seenRef.current[key] = true
-          playAlertSound(latest)
-          const label = latest.category || latest.failure_type || 'Unknown'
-          const message = latest.error || latest.error_message || 'Failure detected'
-          const variant = getSoundProfile(latest).label
-          showSnackbar(`Failure detected · ${label}: ${message}`, variant)
-        }
+      if (nextFailures.length > 0) {
+        processClassificationAlerts(nextFailures)
       }
     } catch (error) {
       console.error('Error loading status:', error)
@@ -158,8 +165,13 @@ function App() {
   useEffect(() => {
     loadStatus()
     const interval = setInterval(loadStatus, 3000)
+    const gestureHandler = () => unlockAudio()
+    window.addEventListener('pointerdown', gestureHandler)
+    window.addEventListener('keydown', gestureHandler)
     return () => {
       clearInterval(interval)
+      window.removeEventListener('pointerdown', gestureHandler)
+      window.removeEventListener('keydown', gestureHandler)
     }
   }, [])
 

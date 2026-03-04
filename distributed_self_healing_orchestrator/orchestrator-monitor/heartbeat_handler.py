@@ -84,7 +84,8 @@ def process_failure(data):
         pass
 
     # kick off async classification using external model if configured
-    model_url = os.environ.get('MODEL_URL') or 'http://localhost:8090/predict'
+    #model_url = os.environ.get('MODEL_URL') or 'http://localhost:8090/predict'  # default to local model for testing
+    model_url = os.environ.get('MODEL_URL') or 'https://rpa-error-classifier-555972249634.us-central1.run.app/predict'
     if model_url:
         try:
             threading.Thread(target=_classify_failure, args=(model_url, failure), daemon=True).start()
