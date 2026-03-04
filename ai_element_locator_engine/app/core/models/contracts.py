@@ -48,9 +48,21 @@ class FailureFromOrchestrator(BaseModel):
             "If provided, DOM fetcher does not need to reload the page."
         ),
     )
+    
+    # Computer Vision inputs (Phase 2)
     screenshot_path: Optional[str] = Field(
         None,
-        description="Optional path (or URI) to a screenshot captured at failure time.",
+        description=(
+            "Optional path (or URI) to a screenshot captured at failure time. "
+            "Used by the OpenCV VisionStrategy."
+        ),
+    )
+    template_path: Optional[str] = Field(
+        None,
+        description=(
+            "Optional path to a cropped template image of the target element. "
+            "Used for OpenCV template matching (VisionStrategy)."
+        ),
     )
 
     metadata: Dict[str, Any] = Field(
@@ -74,6 +86,10 @@ class FailureContext(BaseModel):
     old_locator: Optional[str] = None
     error_type: Optional[str] = None
     error_message: Optional[str] = None
+
+    # add these (to verify vision payload reached backend)
+    screenshot_path: Optional[str] = None
+    template_path: Optional[str] = None
 
 
 class DomContext(BaseModel):

@@ -11,7 +11,7 @@ from __future__ import annotations
 import logging
 import uuid
 from datetime import datetime
-from typing import List
+from typing import List, Optional
 
 from app.core.dom_fetcher import fetch_dom_snapshot
 from app.core.models.contracts import (
@@ -23,11 +23,13 @@ from app.core.models.contracts import (
     ElementExpectation,
     ElementCandidate,
 )
-from app.core.models.internal import ElementCandidateInternal
+from app.core.models.internal import DomSnapshot, ElementCandidateInternal
 from app.core.scoring.reliability_model import ReliabilityModel
 from app.core.strategies.attribute_strategy import AttributeStrategy
 from app.core.strategies.xpath_strategy import XPathStrategy
 from app.core.strategies.css_strategy import CssStrategy
+from app.core.strategies.fuzzy_dom_strategy import FuzzyDomStrategy
+from app.core.strategies.vision_strategy import VisionStrategy
 from app.core.strategies.base import LocatorStrategy
 from app.infra.settings import settings
 
@@ -45,8 +47,8 @@ class ElementLocatorEngine:
             XPathStrategy(),
             CssStrategy(),
             AttributeStrategy(),
-            # FuzzyDOMStrategy(),  # TODO: add implementation
-            # VisionStrategy(),    # TODO: add implementation
+            FuzzyDomStrategy(),
+            VisionStrategy(),
         ]
         self.reliability_model = ReliabilityModel()
 
@@ -58,21 +60,26 @@ class ElementLocatorEngine:
         """
         Main entrypoint called by the FastAPI route.
 
-        1. Obtain DOM snapshot.
-        2. Execute all configured strategies.
+        1. Obtain DOM snapshot (optional).
+        2. Execute all configured strategies (Vision can run without DOM).
         3. Score and rank candidates.
         4. Apply confidence thresholds.
         5. Build LocatorEngineReport.
         """
         logger.info("Received failure event for url=%s", failure.page_url)
 
-        dom = fetch_dom_snapshot(failure)
+        dom: Optional[DomSnapshot] = fetch_dom_snapshot(failure)
+
         if dom is None:
-            logger.error("DOM snapshot could not be retrieved; returning empty report.")
-            return self._build_report(failure, best_candidate=None)
+            logger.warning(
+                "DOM snapshot could not be retrieved; continuing with non-DOM strategies (e.g., vision)."
+            )
 
         candidates = self._run_strategies(dom, failure)
-        self.reliability_model.score_candidates(candidates)
+
+        if candidates:
+            self.reliability_model.score_candidates(candidates)
+
         best_candidate = self._select_best_candidate(candidates)
 
         return self._build_report(failure, best_candidate)
@@ -80,11 +87,21 @@ class ElementLocatorEngine:
     # --------------------- Internal helpers --------------------- #
 
     def _run_strategies(
-        self, dom, failure: FailureFromOrchestrator
+        self, 
+        dom: Optional[DomSnapshot],
+        failure: FailureFromOrchestrator,
     ) -> List[ElementCandidateInternal]:
         all_candidates: List[ElementCandidateInternal] = []
 
         for strategy in self.strategies:
+            # Skip DOM-required strategies when dom is not available
+            if dom is None and getattr(strategy, "requires_dom", True):
+                logger.info(
+                    "Skipping strategy %s because dom=None and requires_dom=True",
+                    strategy.name,
+                )
+                continue
+            
             try:
                 candidates = strategy.find_candidates(dom, failure)
                 logger.info(
@@ -119,7 +136,7 @@ class ElementLocatorEngine:
             best.final_score,
         )
 
-        # Optional: apply confidence thresholds
+        # Apply confidence thresholds gate
         if best.final_score < settings.LOW_CONFIDENCE_THRESHOLD:
             logger.warning(
                 "Best candidate score %.3f below low threshold %.3f – "
@@ -175,12 +192,15 @@ class ElementLocatorEngine:
         public_candidate: ElementCandidate | None = None
 
         if best_candidate is not None:
-            # capture HTML snippet for downstream analysis
-            from lxml import etree
+            # Only try to serialize node HTML if it looks like a real lxml element
+            try:
+                from lxml import etree
 
-            dom_ctx.new_element_html = etree.tostring(
-                best_candidate.node, encoding="unicode"
-            )
+                dom_ctx.new_element_html = etree.tostring(
+                    best_candidate.node, encoding="unicode"
+                )
+            except Exception:
+                dom_ctx.new_element_html = None
 
             public_candidate = ElementCandidate(**best_candidate.to_public_dict())
 

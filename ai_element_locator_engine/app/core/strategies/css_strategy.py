@@ -9,7 +9,7 @@ browser automation layer to evaluate CSS.
 
 from __future__ import annotations
 
-from typing import List
+from typing import List, Optional
 
 from app.core.models.contracts import FailureFromOrchestrator
 from app.core.models.internal import DomSnapshot, ElementCandidateInternal
@@ -18,10 +18,11 @@ from app.core.strategies.base import LocatorStrategy
 
 class CssStrategy(LocatorStrategy):
     name = "css_original"
+    requires_dom = True
 
     def find_candidates(
         self,
-        dom: DomSnapshot,
+        dom: Optional[DomSnapshot],
         failure: FailureFromOrchestrator,
     ) -> List[ElementCandidateInternal]:
         """
@@ -32,6 +33,9 @@ class CssStrategy(LocatorStrategy):
         """
         candidates: List[ElementCandidateInternal] = []
 
+        if dom is None:
+            return candidates
+        
         if not failure.old_locator or failure.old_locator_type != "css":
             return candidates
 

@@ -11,7 +11,7 @@ around the original element rather than only its text and attributes.
 
 from __future__ import annotations
 
-from typing import List
+from typing import List, Optional
 
 from lxml import etree
 
@@ -63,15 +63,21 @@ def _path_similarity(path_a: list[str], path_b: list[str]) -> float:
 
 class FuzzyDomStrategy(LocatorStrategy):
     name = "fuzzy_dom_structure"
+    requires_dom = True
 
     def find_candidates(
         self,
-        dom: DomSnapshot,
+        dom: Optional[DomSnapshot],
         failure: FailureFromOrchestrator,
     ) -> List[ElementCandidateInternal]:
         root: etree._Element = dom.root
         candidates: List[ElementCandidateInternal] = []
 
+        if dom is None:
+            return candidates
+
+        root: etree._Element = dom.root
+        
         # If no old XPath, we cannot compute a reference structural path.
         if not failure.old_locator or failure.old_locator_type != "xpath":
             return candidates
@@ -94,7 +100,11 @@ class FuzzyDomStrategy(LocatorStrategy):
         ref_depth = len(ref_path)
 
         for node in root.iter():
-            tag = node.tag.lower()
+            tag = getattr(node, "tag", "")
+            if not isinstance(tag, str):
+                continue
+    
+            tag = tag.lower()
 
             # Focus on likely interactive nodes – avoids scanning every node.
             if tag not in ("button", "a", "input", "div", "span"):
@@ -106,7 +116,7 @@ class FuzzyDomStrategy(LocatorStrategy):
 
             path_sim = _path_similarity(ref_path, path)
 
-            # Penalise large depth differences (very far above/below).
+            # Penalise large depth differences.
             depth_penalty = max(0.0, 1.0 - depth_diff * 0.1)
             heuristic = path_sim * depth_penalty
 

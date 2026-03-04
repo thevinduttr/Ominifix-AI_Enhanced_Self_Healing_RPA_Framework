@@ -9,7 +9,7 @@ text, semantic role, etc.).
 from __future__ import annotations
 
 import logging
-from typing import List
+from typing import List, Optional
 
 from lxml import etree
 
@@ -49,6 +49,11 @@ class AttributeStrategy(LocatorStrategy):
         root: etree._Element = dom.root
         candidates: List[ElementCandidateInternal] = []
 
+        if dom is None:
+            return candidates
+
+        root: etree._Element = dom.root
+
         expected_text = (failure.expected_text or "").strip()
         old_locator_hint = (failure.old_locator or "").strip()
 
@@ -56,6 +61,10 @@ class AttributeStrategy(LocatorStrategy):
         # want to restrict this to clickable tags (button, a, input, etc.).
         for node in root.iter():
             tag = node.tag.lower()
+            if not isinstance(tag, str):
+                continue
+
+            tag = tag.lower()
 
             # Consider only interactive-like elements as a first filter.
             if tag not in ("button", "a", "input", "div", "span"):
@@ -64,14 +73,16 @@ class AttributeStrategy(LocatorStrategy):
             text = get_visible_text(node)
             id_attr = node.get("id", "")
             name_attr = node.get("name", "")
-            class_attr = node.get("class", "")
-            placeholder = node.get("placeholder", "")
-            aria_label = node.get("aria-label", "")
+            # class_attr = node.get("class", "")
+            # placeholder = node.get("placeholder", "")
+            # aria_label = node.get("aria-label", "")
 
             text_sim = _string_similarity(expected_text, text) if expected_text else 0.0
 
-            id_sim = _string_similarity(old_locator_hint, id_attr)
-            name_sim = _string_similarity(old_locator_hint, name_attr)
+            # The old locator string is often an XPath, so ID similarity is weak by design,
+            # but we keep it for scoring features.
+            id_sim = _string_similarity(old_locator_hint, id_attr) if id_attr else 0.0
+            name_sim = _string_similarity(old_locator_hint, name_attr) if name_attr else 0.0
 
             # Simple heuristic score composed of multiple aspects.
             heuristic = max(text_sim, id_sim, name_sim)
@@ -95,7 +106,7 @@ class AttributeStrategy(LocatorStrategy):
                     xpath=xpath,
                     css=css,
                     strategy=self.name,
-                    heuristic_score=heuristic,
+                    heuristic_score=float(heuristic),
                     features=features,
                 )
             )
