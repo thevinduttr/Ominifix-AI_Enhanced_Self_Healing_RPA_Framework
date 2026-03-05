@@ -274,6 +274,13 @@ def run_full_loop(input_path: Path, verbose: bool = False) -> LoopResult:
 
     lg = LocatorGenerator()
     candidates = lg.generate_candidates(dom.get("new_element_html", ""))
+
+    # Merge upstream element_candidate if provided
+    element_candidate = inp.get("element_candidate")
+    if element_candidate:
+        candidates = lg.merge_external_candidate(candidates, element_candidate)
+        log(7, f"Merged external element_candidate: css={element_candidate.get('css')}, xpath={element_candidate.get('xpath')}")
+
     best = lg.pick_best(candidates)
 
     if not best:

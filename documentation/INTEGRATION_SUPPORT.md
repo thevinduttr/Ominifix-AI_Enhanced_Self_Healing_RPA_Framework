@@ -217,8 +217,44 @@ The bare minimum fields needed for healing to work:
 | `dom_context.page_name` | No | `string` | Human-readable page name |
 | `element_expectation.expected_role` | No | `string` | Semantic role (for logging only) |
 | `element_expectation.expected_text` | No | `string` | Expected visible text (for logging only) |
+| `element_candidate.css` | No | `string` | Pre-computed CSS selector from upstream (Element Locator Engine) |
+| `element_candidate.xpath` | No | `string` | Pre-computed XPath selector from upstream |
+| `element_candidate.full_xpath` | No | `string` | Full XPath (fallback if css and xpath are empty) |
+| `element_candidate.score` | No | `int` | Upstream confidence score (1–100). Capped at 90 internally |
+| `element_candidate.strategy` | No | `string` | Strategy used by upstream (e.g., `id_match`, `class_match`) |
+| `element_candidate.extra` | No | `object` | Additional metadata from upstream (ignored by engine) |
 
-### 4.4 How to Get `new_element_html`
+### 4.4 `element_candidate` — Upstream Locator Hint
+
+The `element_candidate` field is **optional**. When provided by the upstream Element Locator Engine, it is merged into the engine's own generated candidates.
+
+**Behavior:**
+
+| Scenario | What Happens |
+|---|---|
+| `element_candidate` is `null` or missing | Engine uses only its own DOM-generated candidates (normal flow) |
+| `element_candidate` has valid `css` or `xpath` | Merged as an extra candidate with score capped at **90** |
+| `element_candidate` matches a locally generated candidate | Existing candidate's score is boosted (no duplicate) |
+| Local ID-based candidate exists (score=100) | **Local ID wins** — `element_candidate` (max 90) does not override |
+| No local ID and `element_candidate` available | **External candidate wins** — provides the best locator |
+
+**Why cap at 90?** A locally generated `#id` selector (score=100) is the most reliable. The cap ensures external hints enhance accuracy without overriding a confirmed ID match.
+
+**Example — How `element_candidate` helps:**
+
+```
+Element has NO id attribute, only classes:
+  • Engine generates: button.btn-submit (score=60), //button (score=40)
+  • Upstream provides: element_candidate.css = "button[data-action='submit']" (score=90)
+  → Best candidate: "button[data-action='submit']" (external wins!)
+
+Element HAS an id attribute:
+  • Engine generates: #submit-order (score=100)
+  • Upstream provides: element_candidate.css = "button.btn" (score=90)
+  → Best candidate: "#submit-order" (local ID wins)
+```
+
+### 4.5 How to Get `new_element_html`
 
 This is the most critical field. The integrating component must provide the **current HTML** of the target element from the live webpage. Methods to obtain it:
 
@@ -496,6 +532,10 @@ playwright_action →  failure_context.action
 script_file       →  failure_context.script_path
 new_element_html  →  dom_context.new_element_html
 bot_identifier    →  metadata.bot_id
+candidate_css     →  element_candidate.css         (optional)
+candidate_xpath   →  element_candidate.xpath       (optional)
+candidate_score   →  element_candidate.score       (optional)
+candidate_strategy→  element_candidate.strategy    (optional)
 ```
 
 ### 8.3 Downstream Integration (Code Healing Engine → Predictive Testing Engine)
@@ -649,6 +689,14 @@ This is reflected in `model_info.healing_mode` in the output.
   "element_expectation": {
     "expected_role": "submit_button",
     "expected_text": "Place Order"
+  },
+  "element_candidate": {
+    "xpath": "//button[@id='submit-order']",
+    "full_xpath": "/html/body/div/form/button",
+    "css": "#submit-order",
+    "score": 95,
+    "strategy": "id_match",
+    "extra": {}
   }
 }
 ```
@@ -682,6 +730,14 @@ This is reflected in `model_info.healing_mode` in the output.
   "element_expectation": {
     "expected_role": "submit_button",
     "expected_text": "Place Order"
+  },
+  "element_candidate": {
+    "xpath": "//button[@id='submit-order']",
+    "full_xpath": "/html/body/div/form/button",
+    "css": "#submit-order",
+    "score": 95,
+    "strategy": "id_match",
+    "extra": {}
   },
   "healing_summary": {
     "status": "SUCCESS",

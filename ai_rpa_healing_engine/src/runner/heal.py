@@ -97,9 +97,15 @@ def heal_one(input_path: Path) -> str:
         save_json(output_json_path, out)
         return "NO_FIX"
 
-    # Generate best locator candidate from DOM
+    # Generate locator candidates from DOM
     lg = LocatorGenerator()
     candidates = lg.generate_candidates(dom.get("new_element_html", ""))
+
+    # Merge upstream element_candidate if provided (from Element Locator Engine)
+    element_candidate = inp.get("element_candidate")
+    if element_candidate:
+        candidates = lg.merge_external_candidate(candidates, element_candidate)
+
     best = lg.pick_best(candidates)
 
     if not best:

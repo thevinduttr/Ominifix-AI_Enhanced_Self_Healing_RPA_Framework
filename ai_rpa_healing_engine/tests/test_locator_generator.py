@@ -138,3 +138,100 @@ class TestPickBest:
         class_cands = [c for c in candidates if c["score"] == 60]
         assert len(class_cands) >= 1
         assert "card-body" in class_cands[0]["value"]
+
+
+# ── External element_candidate merge ──
+
+class TestMergeExternalCandidate:
+    """Tests for merge_external_candidate — upstream Element Locator Engine integration."""
+
+    def test_merge_css_candidate(self, gen):
+        """External CSS candidate is added with capped score."""
+        candidates = [{"type": "css", "value": ".btn-primary", "score": 60}]
+        ext = {"css": "#submit-btn", "xpath": "//button[@id='submit-btn']", "score": 95, "strategy": "id_match"}
+        result = gen.merge_external_candidate(candidates, ext)
+        ext_cands = [c for c in result if c["value"] == "#submit-btn"]
+        assert len(ext_cands) == 1
+        assert ext_cands[0]["score"] == 90  # capped at 90
+        assert ext_cands[0]["source"] == "external"
+
+    def test_merge_xpath_candidate_when_no_css(self, gen):
+        """Falls back to xpath if css field is empty."""
+        candidates = [{"type": "css", "value": ".btn", "score": 60}]
+        ext = {"css": "", "xpath": "//input[@name='email']", "score": 80}
+        result = gen.merge_external_candidate(candidates, ext)
+        ext_cands = [c for c in result if c["value"] == "//input[@name='email']"]
+        assert len(ext_cands) == 1
+        assert ext_cands[0]["type"] == "xpath"
+
+    def test_merge_full_xpath_fallback(self, gen):
+        """Falls back to full_xpath when css and xpath are both empty."""
+        candidates = []
+        ext = {"css": None, "xpath": "", "full_xpath": "//html/body/form/input", "score": 70}
+        result = gen.merge_external_candidate(candidates, ext)
+        assert len(result) == 1
+        assert result[0]["value"] == "//html/body/form/input"
+
+    def test_merge_null_candidate_returns_unchanged(self, gen):
+        """None element_candidate should return original list untouched."""
+        candidates = [{"type": "css", "value": "#btn", "score": 100}]
+        result = gen.merge_external_candidate(candidates, None)
+        assert result == candidates
+
+    def test_merge_empty_dict_returns_unchanged(self, gen):
+        """Empty dict element_candidate should return original list untouched."""
+        candidates = [{"type": "css", "value": "#btn", "score": 100}]
+        result = gen.merge_external_candidate(candidates, {})
+        assert result == candidates
+
+    def test_merge_no_value_fields_returns_unchanged(self, gen):
+        """If css/xpath/full_xpath are all empty, no candidate is added."""
+        candidates = [{"type": "css", "value": "#btn", "score": 100}]
+        ext = {"css": "", "xpath": "", "full_xpath": "", "score": 80}
+        result = gen.merge_external_candidate(candidates, ext)
+        assert len(result) == 1  # unchanged
+
+    def test_merge_duplicate_boosts_score(self, gen):
+        """If external candidate matches an existing one, boost its score."""
+        candidates = [{"type": "css", "value": "#submit", "score": 60}]
+        ext = {"css": "#submit", "score": 95}
+        result = gen.merge_external_candidate(candidates, ext)
+        # Should NOT add a duplicate; should boost existing
+        assert len(result) == 1
+        assert result[0]["value"] == "#submit"
+        assert result[0]["score"] == 90  # boosted to min(95,90)=90
+        assert result[0]["source"] == "external+internal"
+
+    def test_merge_score_default_when_missing(self, gen):
+        """Score defaults to 90 if not provided."""
+        candidates = []
+        ext = {"css": "#new-btn"}
+        result = gen.merge_external_candidate(candidates, ext)
+        assert result[0]["score"] == 90
+
+    def test_merge_score_default_when_invalid(self, gen):
+        """Score defaults to 90 if out of range."""
+        candidates = []
+        ext = {"css": "#btn", "score": 0}
+        result = gen.merge_external_candidate(candidates, ext)
+        assert result[0]["score"] == 90
+
+    def test_id_still_wins_over_external(self, gen):
+        """Local ID-based candidate (score=100) should outrank external (capped at 90)."""
+        html = '<button id="submit-order" class="btn">Submit</button>'
+        candidates = gen.generate_candidates(html)
+        ext = {"css": "button.btn", "score": 95, "strategy": "class_match"}
+        candidates = gen.merge_external_candidate(candidates, ext)
+        best = gen.pick_best(candidates)
+        assert best["value"] == "#submit-order"  # local ID wins
+        assert best["score"] == 100
+
+    def test_external_wins_when_no_id(self, gen):
+        """External candidate wins over class/xpath when element has no id."""
+        html = '<button class="btn-submit">Go</button>'
+        candidates = gen.generate_candidates(html)
+        ext = {"css": "button[data-action='submit']", "score": 92}
+        candidates = gen.merge_external_candidate(candidates, ext)
+        best = gen.pick_best(candidates)
+        assert best["value"] == "button[data-action='submit']"
+        assert best["score"] == 90  # capped

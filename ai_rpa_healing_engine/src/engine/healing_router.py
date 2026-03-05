@@ -75,6 +75,7 @@ def base_output(inp: dict) -> dict:
             "expected_role": exp.get("expected_role", ""),
             "expected_text": exp.get("expected_text", ""),
         },
+        "element_candidate": inp.get("element_candidate") if inp.get("element_candidate") else None,
         "healing_summary": {
             "status": "NO_FIX",
             "strategy_used": "NO_FIX",
