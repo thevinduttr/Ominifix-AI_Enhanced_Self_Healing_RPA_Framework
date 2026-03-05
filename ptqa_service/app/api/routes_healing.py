@@ -7,6 +7,9 @@ from sqlalchemy.orm import Session
 from app.core.event_ingestor import ingest_healing_event
 from app.core.data_collector import collect_execution_context
 from app.core.feature_engineer import build_feature_vector
+from app.adapters.healing_input_adapter import HealingInputAdapter
+
+_adapter = HealingInputAdapter()
 from app.core.predictor import run_prediction
 from app.core.test_generator import (
     generate_validation_tests,
@@ -23,6 +26,9 @@ router = APIRouter()
 
 @router.post("/evaluate-healing")
 def evaluate_healing(payload: dict, db: Session = Depends(get_db)):
+    # 0) Normalise input format (handles both PTQA native and Code Healing Engine formats)
+    payload = _adapter.adapt(payload)
+
     # 1) Normalise event
     healing_event = ingest_healing_event(payload)
     healing_id = healing_event["healing_id"]
