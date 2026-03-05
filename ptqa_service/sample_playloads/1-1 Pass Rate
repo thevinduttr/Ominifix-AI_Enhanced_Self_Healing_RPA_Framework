@@ -1,0 +1,52 @@
+# Scenario 2 — 1.000 → 1.000 (Stable, No Change)
+
+## Goal
+Show a stable baseline and a stable healed script, confirming that healing introduces no regression and maintains execution reliability.
+
+---
+
+## Step 1 — Use these two bots
+
+### ✅ Baseline
+File Path: `bots/demo_add_remove_original.py`
+
+Expected outcome:
+Passes 100 percent.
+
+---
+
+### ✅ Healed
+File Path: `bots/demo_add_remove.py`
+
+Expected outcome:
+Passes 100 percent.
+
+Both scripts execute successfully with identical behavior.
+
+---
+
+## Step 2 — Use this payload
+
+```json
+{
+  "metadata": {
+    "healing_id": "H_STABLE_001",
+    "script_id": "BOT_ADD_REMOVE",
+    "environment": "qa",
+    "last_n_failures": 0,
+    "headless": true
+  },
+  "healing_summary": {
+    "status": "success",
+    "old_locator": "text=Add Element",
+    "new_locator": "text=Add Element",
+    "strategy_used": "dom"
+  },
+  "model_info": {
+    "model_confidence": 0.85
+  },
+  "script_output": {
+    "original_script_path": "bots/demo_add_remove_original.py",
+    "healed_script_path": "bots/demo_add_remove.py"
+  }
+}

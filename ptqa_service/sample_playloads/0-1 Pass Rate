@@ -1,0 +1,130 @@
+# dynamic_healing_validation_scenario.md
+
+# Dynamic Healing Validation Scenario  
+## AI-Powered Element Locator Engine – Dashboard Test Case
+
+This scenario demonstrates measurable healing effectiveness by comparing an intentionally failing baseline bot with its healed version. The objective is to validate pass rate improvement, locator correction, stability enhancement, and proper healing recommendation logic inside the dashboard evaluation module.
+
+---
+
+## Step 1 — Test Bots
+
+### Baseline Bot (Intentionally Failing)
+
+File Path:  
+`bots/demo_dynamic_original.py`
+
+Faulty Implementation:
+
+```python
+page.get_by_text("Hello World!!", exact=True).wait_for(timeout=5000)
+```
+
+Failure Reasons:
+- Incorrect expected text contains an extra exclamation mark
+- Locator does not match actual DOM content
+- Timeout duration is insufficient for dynamic rendering
+- Execution result is a 100 percent failure rate
+
+---
+
+### Healed Bot (Correct Version)
+
+File Path:  
+`bots/demo_dynamic_loading.py`
+
+Corrected Implementation:
+
+```python
+page.get_by_text("Hello World!", exact=True).wait_for(timeout=12000)
+```
+
+Fix Applied:
+- Corrected text locator string
+- Increased timeout to support dynamic loading
+- DOM-based healing strategy applied
+
+Execution Result:
+- Script passes successfully
+- Stable element detection achieved
+- Full pass rate restored
+
+---
+
+## Step 2 — Dashboard Payload
+
+Paste the following JSON payload into the dashboard healing evaluation interface:
+
+```json
+{
+  "metadata": {
+    "healing_id": "H_IMPROVE_001",
+    "script_id": "BOT_DYNAMIC",
+    "environment": "qa",
+    "last_n_failures": 5,
+    "headless": true
+  },
+  "healing_summary": {
+    "status": "success",
+    "old_locator": "text=Hello World!!",
+    "new_locator": "text=Hello World!",
+    "strategy_used": "dom"
+  },
+  "model_info": {
+    "model_confidence": 0.80
+  },
+  "script_output": {
+    "original_script_path": "bots/demo_dynamic_original.py",
+    "healed_script_path": "bots/demo_dynamic_loading.py"
+  }
+}
+```
+
+---
+
+## Expected Result
+
+### Pass Rate Comparison
+
+| Metric | Value |
+|--------|--------|
+| Before Healing | 0.000 |
+| After Healing  | 1.000 |
+
+Improvement:
+- Stability increased from 0 percent to 100 percent pass rate
+- Absolute pass rate improvement of 1.000
+
+---
+
+## Dashboard Reasoning Section Should Include
+
+- Healing improved stability from 0 percent baseline pass rate to a non zero pass rate.
+- Locator mismatch was successfully corrected using DOM healing strategy.
+- Increased timeout improved dynamic loading reliability.
+- Model confidence score is 0.80.
+- Failure recovery validated against recent execution history.
+
+---
+
+## Final Recommendation
+
+System Recommendation: `APPROVE_HEALING`
+
+Approval Conditions:
+- Measurable execution success improvement
+- Corrected locator validated
+- Acceptable model confidence level
+- Predicted failure probability is not excessively high
+
+---
+
+## Validation Purpose
+
+This scenario validates:
+- DOM-based locator healing accuracy
+- Text mismatch correction capability
+- Dynamic wait stabilization
+- Pass rate analytics improvement
+- Automated healing approval logic
+- Dashboard performance metric correctness
