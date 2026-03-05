@@ -13,7 +13,8 @@ def run_main_flow(context: Dict[str, Any] | None = None) -> Dict[str, Any]:
         title = page.title()
         assert "Example Domain" in title, f"Unexpected title: {title}"
 
-        page.get_by_text("More information", exact=False).click()
-        page.wait_for_timeout(500)
+        page.get_by_text("Learn more", exact=False).click()
+        page.wait_for_load_state("domcontentloaded", timeout=10000)
         assert "iana.org" in page.url.lower(), f"Unexpected URL: {page.url}"
 
+    return run_playwright_flow(context, "login_healed", flow)
