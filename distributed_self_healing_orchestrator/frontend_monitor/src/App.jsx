@@ -16,6 +16,14 @@ const ERROR_TYPE_BY_ID = {
   '8': 'UNKNOWN',
 }
 
+const ERROR_TYPE_ALIASES = {
+  ELEMENTNOTFOUND: 'ELEMENT_NOT_VISIBLE',
+  ELEMENT_NOT_FOUND: 'ELEMENT_NOT_VISIBLE',
+  NO_SUCH_ELEMENT: 'ELEMENT_NOT_VISIBLE',
+  ELEMENTNOTINTERACTABLE: 'ELEMENT_NOT_VISIBLE',
+  STALEELEMENTREFERENCE: 'UI_SELECTOR_CHANGED',
+}
+
 const SOUND_PROFILES = {
   UI_SELECTOR_CHANGED: {
     label: 'UI selector changed tone',
@@ -86,6 +94,7 @@ function App() {
   const audioHintShownRef = useRef(false)
   const pendingAlertsRef = useRef([])
   const locatorSentRef = useRef({})
+  const locatorReportByFailureKeyRef = useRef({})
   const loadStatusRef = useRef(null)
   const unlockAudioRef = useRef(null)
 
@@ -104,6 +113,9 @@ function App() {
     }
 
     const normalized = rawStr.toUpperCase().replace(/\s+/g, '_')
+    if (ERROR_TYPE_ALIASES[normalized]) {
+      return ERROR_TYPE_ALIASES[normalized]
+    }
     if (SOUND_PROFILES[normalized]) {
       return normalized
     }
@@ -218,6 +230,21 @@ function App() {
 
   const getFailureKey = (failure) => `${failure.botId || 'unknown'}:${failure.timestamp || 0}`
 
+  const attachLocatorReport = (failure) => {
+    const key = getFailureKey(failure)
+    const locatorReport = locatorReportByFailureKeyRef.current[key]
+    if (!locatorReport) return failure
+
+    return {
+      ...failure,
+      locator_report: locatorReport,
+      metadata: {
+        ...(failure.metadata || {}),
+        locator_report_id: locatorReport?.metadata?.report_id || null,
+      },
+    }
+  }
+
   const shouldPlayForFailure = (failure, previousCategory) => {
     const category = resolveErrorType(failure)
     if (!category) return false
@@ -247,9 +274,28 @@ function App() {
       const sendKey = `${key}:${currentCategory}`
       if (shouldSendToLocator && !locatorSentRef.current[sendKey]) {
         locatorSentRef.current[sendKey] = true
-        sendToElementLocatorEngine(failure).catch((err) => {
-          console.error('Error sending failure to element locator engine:', err)
-        })
+        sendToElementLocatorEngine(failure)
+          .then((locatorReport) => {
+            locatorReportByFailureKeyRef.current[key] = locatorReport
+            setFailures((prev) =>
+              prev.map((item) => {
+                const itemKey = getFailureKey(item)
+                if (itemKey !== key) return item
+                return {
+                  ...item,
+                  locator_report: locatorReport,
+                  metadata: {
+                    ...(item.metadata || {}),
+                    locator_report_id: locatorReport?.metadata?.report_id || null,
+                  },
+                }
+              })
+            )
+            showSnackbar('AI locator report received', 'generic')
+          })
+          .catch((err) => {
+            console.error('Error sending failure to element locator engine:', err)
+          })
       }
 
       playedRef.current[key] = currentCategory
@@ -261,11 +307,12 @@ function App() {
     try {
       const data = await fetchBotStatus()
       const nextFailures = (data.failures || []).map((failure) => {
+        const enrichedFailure = attachLocatorReport(failure)
         const profile = getSoundProfile(failure)
         return {
-          ...failure,
+          ...enrichedFailure,
           metadata: {
-            ...(failure.metadata || {}),
+            ...(enrichedFailure.metadata || {}),
             sound: profile.label,
           },
         }

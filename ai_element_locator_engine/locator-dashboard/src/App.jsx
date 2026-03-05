@@ -30,6 +30,14 @@ const ERROR_TYPE_BY_ID = {
   "8": "UNKNOWN",
 };
 
+const ERROR_TYPE_ALIASES = {
+  ELEMENTNOTFOUND: "ELEMENT_NOT_VISIBLE",
+  ELEMENT_NOT_FOUND: "ELEMENT_NOT_VISIBLE",
+  NO_SUCH_ELEMENT: "ELEMENT_NOT_VISIBLE",
+  ELEMENTNOTINTERACTABLE: "ELEMENT_NOT_VISIBLE",
+  STALEELEMENTREFERENCE: "UI_SELECTOR_CHANGED",
+};
+
 // Fixed metrics from your latest training run
 const MODEL_METRICS = {
   accuracy: 0.8488,
@@ -170,7 +178,9 @@ function App() {
     if (raw == null) return "UNKNOWN";
     const rawStr = String(raw).trim();
     if (ERROR_TYPE_BY_ID[rawStr]) return ERROR_TYPE_BY_ID[rawStr];
-    return rawStr.toUpperCase().replace(/\s+/g, "_");
+    const normalized = rawStr.toUpperCase().replace(/\s+/g, "_");
+    if (ERROR_TYPE_ALIASES[normalized]) return ERROR_TYPE_ALIASES[normalized];
+    return normalized;
   }
 
   function getFailureClassification(failure) {

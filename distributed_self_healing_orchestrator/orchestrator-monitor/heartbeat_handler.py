@@ -7,10 +7,97 @@ from mq import publish_failure_event
 DEFAULT_MODEL_URL = "https://rpa-error-classifier-555972249634.us-central1.run.app/predict"
 MODEL_READ_TIMEOUT_SECONDS = float(os.environ.get("MODEL_READ_TIMEOUT_SECONDS", "20"))
 MODEL_MAX_RETRIES = int(os.environ.get("MODEL_MAX_RETRIES", "2"))
+DEFAULT_LOCATOR_ENGINE_URL = os.environ.get('LOCATOR_ENGINE_URL', 'http://ai_element_locator:8001/element-locator/report')
+LOCATOR_READ_TIMEOUT_SECONDS = float(os.environ.get("LOCATOR_READ_TIMEOUT_SECONDS", "20"))
 
 # Current known bots and recent failures
 bots = {}
 failures = []  # list of failure dicts with details
+
+
+def _normalize_locator_category(raw_value):
+    if raw_value is None:
+        return 'UNKNOWN'
+    raw = str(raw_value).strip()
+    normalized = raw.upper().replace(' ', '_')
+    aliases = {
+        'ELEMENTNOTFOUND': 'ELEMENT_NOT_VISIBLE',
+        'ELEMENT_NOT_FOUND': 'ELEMENT_NOT_VISIBLE',
+        'NO_SUCH_ELEMENT': 'ELEMENT_NOT_VISIBLE',
+        'ELEMENTNOTINTERACTABLE': 'ELEMENT_NOT_VISIBLE',
+        'STALEELEMENTREFERENCE': 'UI_SELECTOR_CHANGED',
+    }
+    return aliases.get(normalized, normalized)
+
+
+def _should_send_to_locator(failure):
+    category = failure.get('category')
+    if category and str(category).strip().lower() not in {'pending', 'unknown'}:
+        current = category
+    else:
+        current = failure.get('failure_type')
+    normalized = _normalize_locator_category(current)
+    return normalized in {'UI_SELECTOR_CHANGED', 'ELEMENT_NOT_VISIBLE'}
+
+
+def _build_locator_payload(failure):
+    metadata = failure.get('metadata') or {}
+    return {
+        'page_url': failure.get('page_url') or 'about:blank',
+        'failure_type': failure.get('failure_type') or failure.get('category') or 'ELEMENT_NOT_VISIBLE',
+        'failed_action': failure.get('failed_action') or failure.get('last_action') or 'click',
+        'element_role': failure.get('element_role'),
+        'expected_text': failure.get('expected_text'),
+        'old_locator': failure.get('old_locator'),
+        'old_locator_type': failure.get('old_locator_type'),
+        'error_message': failure.get('error') or failure.get('error_message') or 'Failure detected',
+        'page_html': failure.get('page_html') or failure.get('dom'),
+        'screenshot_path': failure.get('screenshot_path'),
+        'template_path': failure.get('template_path'),
+        'metadata': {
+            **metadata,
+            'source': 'distributed_self_healing_orchestrator',
+            'bot_id': failure.get('botId') or metadata.get('bot_id'),
+            'classification': failure.get('category') or failure.get('failure_type'),
+        }
+    }
+
+
+def _request_locator_report(failure):
+    payload = _build_locator_payload(failure)
+    try:
+        resp = requests.post(
+            DEFAULT_LOCATOR_ENGINE_URL,
+            json=payload,
+            timeout=(5, LOCATOR_READ_TIMEOUT_SECONDS),
+        )
+        if not resp.ok:
+            failure['locator_error'] = f"HTTP {resp.status_code}: {resp.text[:200]}"
+            return
+        report = resp.json()
+        failure['locator_report'] = report
+        if isinstance(report, dict):
+            metadata = report.get('metadata') or {}
+            if metadata.get('report_id'):
+                failure['locator_report_id'] = metadata.get('report_id')
+
+        bid = failure.get('botId')
+        if bid and bid in bots:
+            b = bots[bid]
+            if b.get('last_error') and b['last_error'].get('timestamp') == failure.get('timestamp'):
+                b['last_error']['locator_report'] = failure.get('locator_report')
+                if failure.get('locator_report_id'):
+                    b['last_error']['locator_report_id'] = failure.get('locator_report_id')
+                bots[bid] = b
+    except Exception as e:
+        failure['locator_error'] = str(e)
+
+
+def _queue_locator_request(failure):
+    if failure.get('_locator_requested'):
+        return
+    failure['_locator_requested'] = True
+    threading.Thread(target=_request_locator_report, args=(failure,), daemon=True).start()
 
 
 def process_heartbeat(data):
@@ -96,6 +183,9 @@ def process_failure(data):
             failure['category'] = 'pending'
         except Exception:
             failure['category'] = 'unknown'
+
+    if _should_send_to_locator(failure):
+        _queue_locator_request(failure)
 
     return {'status': 'recorded'}
 
@@ -195,6 +285,9 @@ def _classify_failure(model_url, failure):
                     failure['failure_type'] = original_ft
         except Exception:
             pass
+
+        if _should_send_to_locator(failure):
+            _queue_locator_request(failure)
 
         # if the bots dict holds last_error, update it too
         bid = failure.get('botId')

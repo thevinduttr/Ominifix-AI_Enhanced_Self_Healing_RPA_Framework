@@ -41,6 +41,12 @@ function renderFailures(failures){
     if(f.last_action || f.failed_action) meta.push(`<strong>Action:</strong> ${escapeHtml(f.failed_action || f.last_action)}`);
     if(f.strategy) meta.push(`<strong>Strategy:</strong> ${escapeHtml(f.strategy)}`);
     if(f.priority) meta.push(`<strong>Priority:</strong> ${escapeHtml(f.priority)}`);
+    if(f.locator_report_id) meta.push(`<strong>Locator Report:</strong> ${escapeHtml(f.locator_report_id)}`);
+    if(f.locator_report && f.locator_report.element_candidate){
+      const c = f.locator_report.element_candidate;
+      const score = (typeof c.score === 'number') ? c.score.toFixed(3) : 'N/A';
+      meta.push(`<strong>Locator:</strong> ${escapeHtml(c.strategy || 'N/A')} (score ${escapeHtml(score)})`);
+    }
     
     // New comprehensive fields display
     const comprehensiveInfo = [];
@@ -137,6 +143,18 @@ function showFailureJson(failure){
         if(failure.metadata.timestamp) parts.push(['Metadata Timestamp', new Date(failure.metadata.timestamp).toLocaleString()]);
         if(failure.metadata.error_type) parts.push(['Error Type', failure.metadata.error_type]);
       }
+
+        // Locator Engine output fields
+        if(failure.locator_report){
+          const lr = failure.locator_report;
+          if(lr.metadata?.report_id) parts.push(['Locator Report ID', lr.metadata.report_id]);
+          if(lr.metadata?.run_id) parts.push(['Locator Run ID', lr.metadata.run_id]);
+          if(lr.element_candidate?.strategy) parts.push(['Locator Strategy', lr.element_candidate.strategy]);
+          if(typeof lr.element_candidate?.score === 'number') parts.push(['Locator Score', lr.element_candidate.score.toFixed(3)]);
+          if(lr.element_candidate?.xpath) parts.push(['Locator XPath', lr.element_candidate.xpath]);
+          if(lr.element_candidate?.css) parts.push(['Locator CSS', lr.element_candidate.css]);
+        }
+        if(failure.locator_error) parts.push(['Locator Error', failure.locator_error]);
       
       parts.push(['Bot ID', failure.botId || '']);
       parts.push(['Timestamp', failure.timestamp ? new Date(failure.timestamp*1000).toLocaleString() : '']);
@@ -183,6 +201,19 @@ function showFailureJson(failure){
     }else{
       renderBtn.style.display = 'none';
       domContainer.style.display = 'none';
+    }
+  }
+
+  // render locator report JSON block (if available)
+  const locatorPre = document.getElementById('failure-locator-pre');
+  const locatorSection = document.getElementById('failure-locator-section');
+  if(locatorPre && locatorSection){
+    if(failure.locator_report){
+      locatorSection.style.display = 'block';
+      locatorPre.textContent = JSON.stringify(failure.locator_report, null, 2);
+    }else{
+      locatorSection.style.display = 'none';
+      locatorPre.textContent = '';
     }
   }
 

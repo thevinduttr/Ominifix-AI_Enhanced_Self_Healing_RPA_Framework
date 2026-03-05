@@ -21,6 +21,8 @@ function RecentFailures({ failures, onFailureClick }) {
         if (f.category) meta.push(`Classified: ${f.category}`)
         const soundLabel = (f.metadata && f.metadata.sound) || 'Alert tone'
         if (f.category || f.failure_type) meta.push(`Sound: ${soundLabel}`)
+        if (f.locator_report?.metadata?.report_id)
+          meta.push(`Locator Report: ${f.locator_report.metadata.report_id}`)
 
         const categoryBadge = f.category ? (
           <div style={{ marginLeft: '8px', display: 'inline-block' }}>
