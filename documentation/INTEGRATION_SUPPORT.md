@@ -16,14 +16,15 @@
 4. [Input Specification (ELR JSON)](#4-input-specification-elr-json)
 5. [Output Specification](#5-output-specification)
 6. [How to Run](#6-how-to-run)
-7. [Environment Setup](#7-environment-setup)
-8. [Integration Points](#8-integration-points)
-9. [Multi-Bot Routing](#9-multi-bot-routing)
-10. [Supported Error Types & Actions](#10-supported-error-types--actions)
-11. [Confidence Thresholds](#11-confidence-thresholds)
-12. [Complete Input/Output Samples](#12-complete-inputoutput-samples)
-13. [Integration Checklist](#13-integration-checklist)
-14. [Troubleshooting](#14-troubleshooting)
+7. [REST API Integration](#7-rest-api-integration)
+8. [Environment Setup](#8-environment-setup)
+9. [Integration Points](#9-integration-points)
+10. [Multi-Bot Routing](#10-multi-bot-routing)
+11. [Supported Error Types & Actions](#11-supported-error-types--actions)
+12. [Confidence Thresholds](#12-confidence-thresholds)
+13. [Complete Input/Output Samples](#13-complete-inputoutput-samples)
+14. [Integration Checklist](#14-integration-checklist)
+15. [Troubleshooting](#15-troubleshooting)
 
 ---
 
@@ -53,7 +54,7 @@ The **Code Healing Engine** is the self-healing component of the OmniiFix framew
            ▼
 ┌────────────────────────────────────────────────────────────────┐
 │  INPUT: data/inbox/elr_inputs/<BOT_ID>/<DATE>/elr_input.json  │
-│  (or pass directly via --input CLI flag)                      │
+│  (or POST to /api/v1/heal  |  or --input CLI flag)            │
 └──────────┬─────────────────────────────────────────────────────┘
            │
            ▼
@@ -439,9 +440,202 @@ cd ai_rpa_healing_engine
 python -m tools.e2e_system_test --verbose
 ```
 
+### 6.6 REST API Mode (Recommended for Integration)
+
+The healing engine exposes a FastAPI REST API — the **recommended** way for other components to integrate.
+
+**Start the API server:**
+
+```bash
+cd ai_rpa_healing_engine
+python -m uvicorn src.api.app:app --host 0.0.0.0 --port 8000
+```
+
+Or run directly:
+
+```bash
+python -m src.api.app
+```
+
+**Endpoints:**
+
+| Method | Endpoint | Description |
+|---|---|---|
+| `GET` | `/api/v1/health` | Health check & version info |
+| `POST` | `/api/v1/heal` | Heal a single ELR input |
+| `POST` | `/api/v1/heal/batch` | Heal multiple ELR inputs in one call |
+
+**Interactive API docs:** Once the server is running, open `http://localhost:8000/docs` in your browser.
+
+See [Section 7 — REST API Integration](#7-rest-api-integration) for full request/response samples and integration code.
+
 ---
 
-## 7. Environment Setup
+## 7. REST API Integration
+
+The REST API is the **primary integration method** for other components. It accepts ELR JSON as a POST body and returns the full healing output as the JSON response — no file system access needed.
+
+### 7.1 Single Heal — `POST /api/v1/heal`
+
+**Request:**
+
+```bash
+curl -X POST http://localhost:8000/api/v1/heal \
+  -H "Content-Type: application/json" \
+  -d '{
+    "metadata": {
+      "bot_id": "BOT-ECOMMERCE-01",
+      "run_id": "run-20260305-001"
+    },
+    "failure_context": {
+      "script_path": "bots/checkout_flow.py",
+      "failing_line": 15,
+      "action": "click",
+      "old_locator": "#submit-order-old",
+      "error_type": "ELEMENT_NOT_FOUND"
+    },
+    "dom_context": {
+      "new_element_html": "<button id=\"submit-order\" class=\"btn\">Place Order</button>"
+    }
+  }'
+```
+
+**Response (200 OK):**
+
+```json
+{
+  "metadata": {
+    "healing_id": "HEAL-a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+    "bot_id": "BOT-ECOMMERCE-01",
+    "timestamp": "2026-03-05T14:00:05.123456",
+    "source_component": "code_healing_engine",
+    "target_component": "predictive_testing_engine"
+  },
+  "healing_summary": {
+    "status": "SUCCESS",
+    "strategy_used": "LOCATOR_REGEN_LIBCST",
+    "old_locator": "#submit-order-old",
+    "new_locator": "#submit-order",
+    "confidence": 0.85,
+    "patcher": "LibCST",
+    "validation": { "valid": true, "reason": "OK" }
+  },
+  "script_output": {
+    "original_script_path": "bots/checkout_flow.py",
+    "healed_script_path": "data/outbox/healed_scripts/BOT-ECOMMERCE-01/..."
+  },
+  "model_info": {
+    "model": "strategy_selector_v1",
+    "confidence": 0.85
+  }
+}
+```
+
+### 7.2 Batch Heal — `POST /api/v1/heal/batch`
+
+**Request:**
+
+```json
+{
+  "inputs": [
+    { "metadata": {...}, "failure_context": {...}, "dom_context": {...} },
+    { "metadata": {...}, "failure_context": {...}, "dom_context": {...} }
+  ]
+}
+```
+
+**Response (200 OK):**
+
+```json
+{
+  "total": 2,
+  "success": 1,
+  "no_fix": 1,
+  "failed": 0,
+  "results": [
+    { "healing_summary": { "status": "SUCCESS", ... }, ... },
+    { "healing_summary": { "status": "NO_FIX", ... }, ... }
+  ]
+}
+```
+
+### 7.3 Health Check — `GET /api/v1/health`
+
+```json
+{
+  "status": "ok",
+  "version": "1.0.0",
+  "component": "code_healing_engine"
+}
+```
+
+### 7.4 Error Responses
+
+| HTTP Code | When | Response Body |
+|---|---|---|
+| `200` | Healing completed (even NO_FIX) | Full healing output JSON |
+| `422` | Invalid input (missing required fields) | Pydantic validation errors |
+| `500` | Unexpected engine error | `{"detail": {"error": "HEALING_ENGINE_ERROR", "message": "..."}}` |
+
+### 7.5 Integration Code Samples
+
+**Python (requests):**
+
+```python
+import requests
+
+ELR_INPUT = {
+    "metadata": {"bot_id": "BOT-HR-01", "run_id": "run-001"},
+    "failure_context": {
+        "script_path": "bots/hr_portal.py",
+        "failing_line": 22,
+        "action": "click",
+        "old_locator": "#login-btn-old",
+        "error_type": "ELEMENT_NOT_FOUND",
+    },
+    "dom_context": {
+        "new_element_html": '<button id="login-btn" class="btn">Login</button>',
+    },
+}
+
+response = requests.post("http://localhost:8000/api/v1/heal", json=ELR_INPUT)
+result = response.json()
+
+if result["healing_summary"]["status"] == "SUCCESS":
+    print(f"Healed! New locator: {result['healing_summary']['new_locator']}")
+    print(f"Healed script: {result['script_output']['healed_script_path']}")
+else:
+    print(f"Status: {result['healing_summary']['status']}")
+    print(f"Reason: {result['healing_summary']['validation']['reason']}")
+```
+
+**JavaScript / Node.js (fetch):**
+
+```javascript
+const response = await fetch('http://localhost:8000/api/v1/heal', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify(elrInput)
+});
+
+const result = await response.json();
+console.log(result.healing_summary.status);     // "SUCCESS" | "NO_FIX" | "FAILED"
+console.log(result.healing_summary.new_locator); // "#submit-order"
+```
+
+### 7.6 API Configuration
+
+| Setting | Default | Environment Variable | Description |
+|---|---|---|---|
+| Host | `0.0.0.0` | — | Bind address |
+| Port | `8000` | — | HTTP port |
+| CORS | `*` (all origins) | — | Restrict in production |
+| Auto-docs | `/docs` (Swagger) | — | Interactive API docs |
+| ReDoc | `/redoc` | — | Alternative API docs |
+
+---
+
+## 8. Environment Setup
 
 ### 7.1 Prerequisites
 
@@ -491,9 +685,23 @@ python -m src.ml.train_strategy_model
 
 ---
 
-## 8. Integration Points
+## 9. Integration Points
 
-### 8.1 How Other Components Send Input
+### 9.1 How Other Components Send Input
+
+**Option A — REST API (Recommended):**
+
+Send a POST request to the healing API and get the result as the JSON response:
+
+```bash
+curl -X POST http://localhost:8000/api/v1/heal \
+  -H "Content-Type: application/json" \
+  -d @elr_input.json
+```
+
+See [Section 7 — REST API Integration](#7-rest-api-integration) for full details.
+
+**Option B — File-Based (CLI):**
 
 **Step 1:** Generate an ELR JSON file when your bot detects a locator failure.
 
@@ -518,7 +726,7 @@ python -m src.runner.heal --inbox "data/inbox/elr_inputs"
 data/outbox/healing_outputs/<YOUR_BOT_ID>/<DATE>/healing_output--<TS>.json
 ```
 
-### 8.2 Upstream Integration (Element Locator Engine → Code Healing Engine)
+### 9.2 Upstream Integration (Element Locator Engine → Code Healing Engine)
 
 The Element Locator Engine detects DOM changes and generates the ELR input. It must provide:
 
@@ -538,7 +746,7 @@ candidate_score   →  element_candidate.score       (optional)
 candidate_strategy→  element_candidate.strategy    (optional)
 ```
 
-### 8.3 Downstream Integration (Code Healing Engine → Predictive Testing Engine)
+### 9.3 Downstream Integration (Code Healing Engine → Predictive Testing Engine)
 
 After healing, the output JSON contains everything the testing engine needs:
 
@@ -552,7 +760,7 @@ model_info.ml_confidence    →  how confident was the fix?
 healing_summary.validation  →  did it pass syntax check?
 ```
 
-### 8.4 Integration Flow Diagram
+### 9.4 Integration Flow Diagram
 
 ```
 ┌────────────────────┐     ELR JSON      ┌──────────────────────┐    Healing Output    ┌──────────────────────┐
@@ -568,7 +776,7 @@ healing_summary.validation  →  did it pass syntax check?
 
 ---
 
-## 9. Multi-Bot Routing
+## 10. Multi-Bot Routing
 
 The system handles multiple bots simultaneously. Every input/output is routed by `bot_id`:
 
@@ -597,7 +805,7 @@ Bot C fails  →  ELR with bot_id="BOT-C"  →  output: data/outbox/.../BOT-C/..
 
 ---
 
-## 10. Supported Error Types & Actions
+## 11. Supported Error Types & Actions
 
 ### Supported Error Types (healable)
 
@@ -638,7 +846,7 @@ If the error type is not in the supported list, or the action is not supported, 
 
 ---
 
-## 11. Confidence Thresholds
+## 12. Confidence Thresholds
 
 The ML classifier produces a confidence score that determines healing behavior:
 
@@ -652,7 +860,7 @@ This is reflected in `model_info.healing_mode` in the output.
 
 ---
 
-## 12. Complete Input/Output Samples
+## 13. Complete Input/Output Samples
 
 ### 12.1 Sample Scenario: Button ID Changed on Website
 
@@ -823,7 +1031,7 @@ When the system cannot heal, it returns a clear reason:
 
 ---
 
-## 13. Integration Checklist
+## 14. Integration Checklist
 
 Use this checklist when integrating your component with the Code Healing Engine:
 
@@ -838,10 +1046,12 @@ Use this checklist when integrating your component with the Code Healing Engine:
 - [ ] Provide the `new_element_html` from the live page's current DOM
 - [ ] Use a supported `error_type` (see Section 10)
 - [ ] Place the file in the inbox or pass via `--input` CLI
+- [ ] **Or preferably:** POST the JSON to `POST /api/v1/heal` and read the response directly
 
 ### For the **downstream component** (reading outputs):
 
-- [ ] Read healing output JSON from `data/outbox/healing_outputs/<BOT_ID>/<DATE>/`
+- [ ] **API mode:** Parse the JSON response from the `/api/v1/heal` endpoint directly
+- [ ] **File mode:** Read healing output JSON from `data/outbox/healing_outputs/<BOT_ID>/<DATE>/`
 - [ ] Check `healing_summary.status` — only `SUCCESS` means the script was patched
 - [ ] If `SUCCESS`, find the healed script at `script_output.healed_script_path`
 - [ ] Check `healing_summary.validation.valid` to confirm syntax correctness
@@ -855,19 +1065,24 @@ Use this checklist when integrating your component with the Code Healing Engine:
 - [ ] ML model exists at `models/strategy_selector_v1.pkl`
 - [ ] Set `RPA_ROOT` env var if scripts are outside the `ai_rpa_healing_engine/` directory
 - [ ] Working directory must be `ai_rpa_healing_engine/` when running
+- [ ] **API mode:** Start the server with `uvicorn src.api.app:app --port 8000`
+- [ ] **API mode:** Verify health at `GET /api/v1/health` before sending healing requests
 
 ---
 
-## 14. Troubleshooting
+## 15. Troubleshooting
 
 | Problem | Cause | Solution |
 |---|---|---|
 | `NO_FIX`: "Original script not found" | `script_path` doesn't resolve | Set `RPA_ROOT` env var to workspace root |
 | `NO_FIX`: "Missing dom_context.new_element_html" | Empty `new_element_html` | Provide the current DOM HTML of the element |
-| `NO_FIX`: "Error type not healable" | Unsupported `error_type` | Use a supported type from Section 10 |
+| `NO_FIX`: "Error type not healable" | Unsupported `error_type` | Use a supported type from Section 11 |
 | `NO_FIX`: "Action not supported" | Unsupported `action` | Use: `click`, `fill`, `wait_for_selector`, `query_selector_all`, `locator` |
 | `NO_FIX`: "ML confidence below threshold" | Low confidence score | Provide better `new_element_html` with ID attributes |
 | `FAILED`: "Patcher failed" | Locator not found at `failing_line` | Verify `failing_line` and `old_locator` exactly match the script |
+| API `422` Validation Error | Missing required fields | Check `metadata.bot_id`, `failure_context.*`, `dom_context.new_element_html` |
+| API `500` Internal Error | Engine crash | Check server logs; ensure ML model file exists |
+| API connection refused | Server not running | Start with `uvicorn src.api.app:app --port 8000` |
 | Unicode errors on Windows | Console encoding | Set `$env:PYTHONIOENCODING = "utf-8"` |
 | Model not found | Missing `.pkl` file | Run `python -m src.ml.train_strategy_model` |
 | Output in wrong bot folder | Wrong `bot_id` | Each ELR must have the correct `metadata.bot_id` |

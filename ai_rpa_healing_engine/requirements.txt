@@ -20,3 +20,8 @@ pandas
 # ---------- Utilities ----------
 tqdm
 streamlit
+
+# ---------- REST API ----------
+fastapi
+uvicorn[standard]
+httpx

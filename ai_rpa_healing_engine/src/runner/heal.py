@@ -43,9 +43,18 @@ def save_json(p: Path, data: dict):
     p.write_text(json.dumps(data, indent=2), encoding="utf-8")
 
 
-def heal_one(input_path: Path) -> str:
-    inp = load_json(input_path)
+def heal_from_dict(inp: dict, *, persist: bool = True) -> dict:
+    """
+    Core healing logic — takes an ELR dict and returns the healing output dict.
 
+    Args:
+        inp: ELR input dictionary.
+        persist: If True, save output JSON and healed script to disk.
+                 Set False for pure API / in-memory usage.
+
+    Returns:
+        Full healing output dictionary.
+    """
     md = inp.get("metadata", {})
     fc = inp.get("failure_context", {})
     dom = inp.get("dom_context", {})
@@ -84,8 +93,9 @@ def heal_one(input_path: Path) -> str:
         }
         out["script_output"]["original_script_path"] = str(resolved_script)
         out["script_output"]["healed_script_path"] = ""
-        save_json(output_json_path, out)
-        return "NO_FIX"
+        if persist:
+            save_json(output_json_path, out)
+        return out
 
     decision = decide(inp)
     if decision:
@@ -94,8 +104,9 @@ def heal_one(input_path: Path) -> str:
         out["healing_summary"]["validation"] = {"valid": True, "reason": decision.reason}
         out["script_output"]["original_script_path"] = str(resolved_script)
         out["script_output"]["healed_script_path"] = ""
-        save_json(output_json_path, out)
-        return "NO_FIX"
+        if persist:
+            save_json(output_json_path, out)
+        return out
 
     # Generate locator candidates from DOM
     lg = LocatorGenerator()
@@ -114,8 +125,9 @@ def heal_one(input_path: Path) -> str:
         out["healing_summary"]["validation"] = {"valid": True, "reason": "No locator candidates generated."}
         out["script_output"]["original_script_path"] = str(resolved_script)
         out["script_output"]["healed_script_path"] = ""
-        save_json(output_json_path, out)
-        return "NO_FIX"
+        if persist:
+            save_json(output_json_path, out)
+        return out
 
     # ========================================
     # CONFIDENCE-AWARE HEALING GATE
@@ -152,8 +164,9 @@ def heal_one(input_path: Path) -> str:
             }
             out["script_output"]["original_script_path"] = str(resolved_script)
             out["script_output"]["healed_script_path"] = ""
-            save_json(output_json_path, out)
-            return "NO_FIX"
+            if persist:
+                save_json(output_json_path, out)
+            return out
     
     else:
         # Low confidence: reject healing (NO_FIX)
@@ -171,8 +184,9 @@ def heal_one(input_path: Path) -> str:
         }
         out["script_output"]["original_script_path"] = str(resolved_script)
         out["script_output"]["healed_script_path"] = ""
-        save_json(output_json_path, out)
-        return "NO_FIX"
+        if persist:
+            save_json(output_json_path, out)
+        return out
 
     # Patch script
     patcher = ScriptPatcher()
@@ -195,8 +209,9 @@ def heal_one(input_path: Path) -> str:
         out["script_output"]["original_script_path"] = str(resolved_script)
         out["script_output"]["healed_script_path"] = ""
         out["model_info"]["healing_mode"] = healing_mode
-        save_json(output_json_path, out)
-        return "FAILED"
+        if persist:
+            save_json(output_json_path, out)
+        return out
 
     # Validate healed script
     validator = HealingValidator()
@@ -216,8 +231,16 @@ def heal_one(input_path: Path) -> str:
     out["model_info"]["healing_mode"] = healing_mode
     out["model_info"]["ml_confidence"] = float(pred.confidence)
 
-    save_json(output_json_path, out)
-    return status
+    if persist:
+        save_json(output_json_path, out)
+    return out
+
+
+def heal_one(input_path: Path) -> str:
+    """File-based wrapper: reads JSON from disk, heals, saves output, returns status string."""
+    inp = load_json(input_path)
+    out = heal_from_dict(inp, persist=True)
+    return out["healing_summary"]["status"]
 
 
 def process_inbox(inbox: Path):
