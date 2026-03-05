@@ -1,3 +1,5 @@
+from typing import Any, Dict, List, Optional
+
 from bs4 import BeautifulSoup
 
 
@@ -11,7 +13,7 @@ class LocatorGenerator:
 
     IMPORTANT_ATTRS = ["id", "name", "aria-label", "placeholder", "type", "role", "title"]
 
-    def generate_candidates(self, element_html: str):
+    def generate_candidates(self, element_html: str) -> List[Dict[str, Any]]:
         if not element_html or not element_html.strip():
             return []
 
@@ -75,7 +77,67 @@ class LocatorGenerator:
 
         return out
 
-    def pick_best(self, candidates):
+    def merge_external_candidate(self, candidates: List[Dict[str, Any]], element_candidate: dict) -> List[Dict[str, Any]]:
+        """
+        Merge an upstream element_candidate (from Element Locator Engine) into
+        the generated candidates list.  The external candidate is treated as a
+        high-quality hint: its score is capped at 90 so a local ID-based match
+        (score 100) still wins, but it outranks attribute/class/xpath fallbacks.
+
+        If element_candidate is None, empty, or missing required fields, the
+        original candidates list is returned unchanged.
+        """
+        if not element_candidate or not isinstance(element_candidate, dict):
+            return candidates
+
+        # Determine the best available locator value from the external candidate
+        ext_value = (
+            element_candidate.get("css")
+            or element_candidate.get("xpath")
+            or element_candidate.get("full_xpath")
+            or ""
+        ).strip()
+
+        if not ext_value:
+            return candidates
+
+        # Determine type
+        if ext_value.startswith("//") or ext_value.startswith("("):
+            ext_type = "xpath"
+        else:
+            ext_type = "css"
+
+        # Score: use upstream score if valid (1-100 range), else default to 90
+        raw_score = element_candidate.get("score")
+        if isinstance(raw_score, (int, float)) and 1 <= raw_score <= 100:
+            ext_score = min(int(raw_score), 90)  # cap at 90 so local id=100 wins
+        else:
+            ext_score = 90
+
+        # Remove outer quotes if present (RAW invariant)
+        if (ext_value.startswith("'") and ext_value.endswith("'")) or \
+           (ext_value.startswith('"') and ext_value.endswith('"')):
+            ext_value = ext_value[1:-1].strip()
+
+        # Avoid duplicates — if same value already exists, boost its score instead
+        for c in candidates:
+            if c["value"] == ext_value:
+                c["score"] = max(c["score"], ext_score)
+                c["source"] = "external+internal"
+                return candidates
+
+        # Insert the external candidate
+        candidates.append({
+            "type": ext_type,
+            "value": ext_value,
+            "score": ext_score,
+            "source": "external",
+            "strategy": element_candidate.get("strategy", ""),
+        })
+
+        return candidates
+
+    def pick_best(self, candidates: List[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
         if not candidates:
             return None
         return sorted(candidates, key=lambda x: x["score"], reverse=True)[0]

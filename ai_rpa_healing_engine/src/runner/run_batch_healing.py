@@ -1,4 +1,5 @@
 import json
+import logging
 from pathlib import Path
 
 from src.locator_gen.locator_generator import LocatorGenerator
@@ -7,23 +8,61 @@ from src.engine.healing_validator import HealingValidator
 from src.ml.dataset_logger import DatasetLogger
 from src.ml.sample_generator import SampleGenerator
 
+logger = logging.getLogger(__name__)
 
-def label_strategy(best_locator: str) -> str:
-    # If id-based, it's our "main" locator regen strategy
-    if best_locator.startswith("#") or "#" in best_locator.split("[", 1)[0]:
+
+def label_strategy(best_locator: dict, action: str, element_html: str) -> str:
+    """
+    Intelligent strategy labeling based on locator characteristics and action type.
+    
+    5-class taxonomy:
+      - LOCATOR_REGEN_LIBCST: ID-based selectors (#id)
+      - FALLBACK_LOCATOR: Attribute-based (aria-label, placeholder, name, type)
+      - FALLBACK_XPATH: XPath-based (no CSS-friendly attributes)
+      - CLICK_ONLY: Button/link click actions
+      - NO_FIX: Empty/invalid input
+    """
+    locator_value = best_locator.get("value", "")
+    locator_type = best_locator.get("type", "css")
+    
+    # Check for click-specific actions on buttons/links
+    if action == "click":
+        # Check if element is button or link
+        if any(tag in element_html.lower() for tag in ["<button", "<a ", "role=\"button\""]):
+            # If it has an ID, it's still CLICK_ONLY
+            if locator_value.startswith("#") or locator_type == "css" and "#" in locator_value:
+                return "CLICK_ONLY"
+            return "CLICK_ONLY"
+    
+    # ID-based is highest confidence
+    if locator_value.startswith("#"):
         return "LOCATOR_REGEN_LIBCST"
+    
+    # Check if it's an ID-based CSS selector (e.g., "button#submitBtn")
+    if locator_type == "css" and "#" in locator_value.split("[", 1)[0]:
+        return "LOCATOR_REGEN_LIBCST"
+    
+    # XPath fallback
+    if locator_type == "xpath":
+        return "FALLBACK_XPATH"
+    
+    # Attribute-based CSS selectors (aria-label, placeholder, name, etc.)
+    if locator_type == "css" and any(attr in locator_value for attr in ["[aria-label=", "[placeholder=", "[name=", "[type="]):
+        return "FALLBACK_LOCATOR"
+    
+    # Default fallback
     return "FALLBACK_LOCATOR"
 
 
 def main():
-    # Generate more samples (60 gives better balance)
+    # Generate more samples (150 gives better balance and statistical significance)
     gen = SampleGenerator()
-    count = gen.generate(n=60)
-    print(f"[INFO] Generated {count} synthetic inputs")
+    count = gen.generate(n=150)
+    logger.info("Generated %d synthetic inputs", count)
 
     locator_gen = LocatorGenerator()
     patcher = ScriptPatcher()
-    logger = DatasetLogger()
+    dataset_logger = DatasetLogger()
 
     inputs_dir = Path("data/synthetic_inputs/batch")
     healed_dir = Path("data/scripts/healed/batch")
@@ -39,6 +78,7 @@ def main():
         error_type = inp["failure_context"]["error_type"]
         script_path = inp["failure_context"]["script_path"]
         failing_line = int(inp["failure_context"]["failing_line"])
+        action = inp["failure_context"].get("action", "fill")
         old_locator = inp["failure_context"]["old_locator"]
         element_html = inp["dom_context"]["new_element_html"]
 
@@ -48,7 +88,7 @@ def main():
 
         if not best:
             failed += 1
-            logger.log(
+            dataset_logger.log(
                 bot_id=bot_id,
                 error_type=error_type,
                 old_locator=old_locator,
@@ -62,7 +102,7 @@ def main():
 
         new_locator = best["value"]
         confidence = best.get("score", 0) / 100.0
-        strategy = label_strategy(new_locator)
+        strategy = label_strategy(best, action, element_html)
 
         # 2) Patch
         healed_path = healed_dir / f"{bot_id}_healed.py"
@@ -72,11 +112,12 @@ def main():
             failing_line=failing_line,
             old_locator=old_locator,
             new_locator=new_locator,
+            action=action,
         )
 
         if result.status != "SUCCESS":
             failed += 1
-            logger.log(
+            dataset_logger.log(
                 bot_id=bot_id,
                 error_type=error_type,
                 old_locator=old_locator,
@@ -92,7 +133,7 @@ def main():
         validation = HealingValidator.validate_script(result.healed_script_path)
         if not validation["valid"]:
             failed += 1
-            logger.log(
+            dataset_logger.log(
                 bot_id=bot_id,
                 error_type=error_type,
                 old_locator=old_locator,
@@ -105,7 +146,7 @@ def main():
             continue
 
         # 4) Log as success with strategy label
-        logger.log(
+        dataset_logger.log(
             bot_id=bot_id,
             error_type=error_type,
             old_locator=old_locator,
@@ -117,9 +158,10 @@ def main():
         )
         success += 1
 
-    print(f"[RESULT] SUCCESS={success} FAILED={failed}")
-    print("[INFO] Dataset updated at: data/ml/healing_dataset.csv")
+    logger.info("SUCCESS=%d FAILED=%d", success, failed)
+    logger.info("Dataset updated at: data/ml/healing_dataset.csv")
 
 
 if __name__ == "__main__":
+    logging.basicConfig(level=logging.INFO, format="%(message)s")
     main()

@@ -1,17 +1,26 @@
 {
-  "version": "v1",
+  "version": "v2",
   "labels": [
     "LOCATOR_REGEN_LIBCST",
-    "WAIT_RETRY",
     "FALLBACK_LOCATOR",
+    "FALLBACK_XPATH",
+    "CLICK_ONLY",
+    "WAIT_RETRY",
     "TEMPLATE_REPAIR",
     "NO_FIX"
   ],
   "description": {
-    "LOCATOR_REGEN_LIBCST": "Generate a new locator from DOM snippet and patch script preserving format using LibCST.",
-    "WAIT_RETRY": "Add wait/retry logic when element appears late.",
-    "FALLBACK_LOCATOR": "Switch to an alternate selector strategy (e.g., aria-label, placeholder).",
-    "TEMPLATE_REPAIR": "Apply a repair template for common RPA patterns.",
-    "NO_FIX": "Insufficient data or unsafe patch; no healing performed."
+    "LOCATOR_REGEN_LIBCST": "Generate ID-based locator (#id) and patch script preserving format using LibCST. Highest confidence strategy.",
+    "FALLBACK_LOCATOR": "Generate attribute-based locator (aria-label, placeholder, name, type) when no ID available.",
+    "FALLBACK_XPATH": "Generate XPath locator when element has no CSS-friendly attributes. Lower confidence.",
+    "CLICK_ONLY": "Specialized healing for button/link click actions. Optimized for clickable elements.",
+    "WAIT_RETRY": "Add wait/retry logic when element appears late or is temporarily unavailable.",
+    "TEMPLATE_REPAIR": "Apply a repair template for common RPA patterns and known failure scenarios.",
+    "NO_FIX": "Insufficient data, empty DOM, or unsafe patch conditions. No healing performed."
+  },
+  "confidence_thresholds": {
+    "aggressive": 0.70,
+    "conservative": 0.50,
+    "no_fix": 0.50
   }
 }
