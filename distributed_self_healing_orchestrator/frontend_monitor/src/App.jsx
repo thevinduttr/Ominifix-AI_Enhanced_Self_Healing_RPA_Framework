@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import Header from './components/Header'
 import BotsTable from './components/BotsTable'
 import ChartsPanel from './components/ChartsPanel'
-import { fetchBotStatus } from './services/api'
+import { fetchBotStatus, sendToElementLocatorEngine } from './services/api'
 
 const ERROR_TYPE_BY_ID = {
   '0': 'UI_SELECTOR_CHANGED',
@@ -85,6 +85,7 @@ function App() {
   const audioUnlockedRef = useRef(false)
   const audioHintShownRef = useRef(false)
   const pendingAlertsRef = useRef([])
+  const locatorSentRef = useRef({})
   const loadStatusRef = useRef(null)
   const unlockAudioRef = useRef(null)
 
@@ -238,6 +239,17 @@ function App() {
         const message = failure.error || failure.error_message || 'Failure detected'
         const profile = getSoundProfile(failure)
         showSnackbar(`Failure detected · ${label}: ${message}`, profile.variant)
+      }
+
+      const shouldSendToLocator =
+        currentCategory === 'UI_SELECTOR_CHANGED' ||
+        currentCategory === 'ELEMENT_NOT_VISIBLE'
+      const sendKey = `${key}:${currentCategory}`
+      if (shouldSendToLocator && !locatorSentRef.current[sendKey]) {
+        locatorSentRef.current[sendKey] = true
+        sendToElementLocatorEngine(failure).catch((err) => {
+          console.error('Error sending failure to element locator engine:', err)
+        })
       }
 
       playedRef.current[key] = currentCategory

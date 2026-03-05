@@ -9,6 +9,10 @@ export default defineConfig({
       '/status': {
         target: 'http://localhost:8000',
         changeOrigin: true
+      },
+      '/element-locator': {
+        target: 'http://localhost:8001',
+        changeOrigin: true
       }
     }
   }

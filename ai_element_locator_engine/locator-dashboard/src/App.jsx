@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   PieChart,
   Pie,
@@ -14,7 +14,21 @@ import {
 
 const API_BASE =
   import.meta.env.VITE_API_BASE_URL?.trim() || "http://127.0.0.1:8001";
+const ORCHESTRATOR_STATUS_URL =
+  import.meta.env.VITE_ORCHESTRATOR_STATUS_URL?.trim() || "/orchestrator/status";
 const HISTORY_KEY = "locator_dashboard_history";
+
+const ERROR_TYPE_BY_ID = {
+  "0": "UI_SELECTOR_CHANGED",
+  "1": "ELEMENT_NOT_VISIBLE",
+  "2": "TIMEOUT_ERROR",
+  "3": "APPLICATION_UPDATE",
+  "4": "NETWORK_ERROR",
+  "5": "BOT_LOGIC_ERROR",
+  "6": "ENV_CONFIG_ERROR",
+  "7": "AUTHENTICATION_ERROR",
+  "8": "UNKNOWN",
+};
 
 // Fixed metrics from your latest training run
 const MODEL_METRICS = {
@@ -122,6 +136,7 @@ function App() {
   const [error, setError] = useState("");
   const [currentReport, setCurrentReport] = useState(null);
   const [history, setHistory] = useState([]);
+  const routedFailuresRef = useRef({});
 
   // ========== History persistence (localStorage) ==========
 
@@ -151,6 +166,92 @@ function App() {
 
   // ========== Core: call backend ==========
 
+  function normalizeClassification(raw) {
+    if (raw == null) return "UNKNOWN";
+    const rawStr = String(raw).trim();
+    if (ERROR_TYPE_BY_ID[rawStr]) return ERROR_TYPE_BY_ID[rawStr];
+    return rawStr.toUpperCase().replace(/\s+/g, "_");
+  }
+
+  function getFailureClassification(failure) {
+    const raw =
+      failure?.category ??
+      failure?.failure_type ??
+      failure?.metadata?.error_type ??
+      failure?.metadata?.classification;
+    return normalizeClassification(raw);
+  }
+
+  function shouldAutoRouteFailure(failure) {
+    const classification = getFailureClassification(failure);
+    return (
+      classification === "UI_SELECTOR_CHANGED" ||
+      classification === "ELEMENT_NOT_VISIBLE"
+    );
+  }
+
+  function buildPayloadFromFailure(failure) {
+    return {
+      page_url: failure.page_url || "about:blank",
+      failure_type: failure.failure_type || failure.category || "ELEMENT_NOT_VISIBLE",
+      failed_action: failure.failed_action || failure.last_action || "click",
+      element_role: failure.element_role || null,
+      expected_text: failure.expected_text || null,
+      old_locator: failure.old_locator || null,
+      old_locator_type: failure.old_locator_type || null,
+      error_message: failure.error || failure.error_message || "Auto route from orchestrator",
+      page_html: failure.page_html || failure.dom || null,
+      screenshot_path: failure.screenshot_path || null,
+      template_path: failure.template_path || null,
+      metadata: {
+        ...(failure.metadata || {}),
+        source: "distributed_self_healing_orchestrator",
+        bot_id: failure.botId || null,
+        classification: getFailureClassification(failure),
+        auto_routed: true,
+      },
+    };
+  }
+
+  function applyPayloadToForm(payload) {
+    setPageUrl(payload.page_url || "");
+    setExpectedText(payload.expected_text || "");
+    setOldLocator(payload.old_locator || "");
+    setOldLocatorType(payload.old_locator_type === "css" ? "css" : "xpath");
+    setRawHtml(payload.page_html || "");
+    setScreenshotPath(payload.screenshot_path || "");
+    setTemplatePath(payload.template_path || "");
+  }
+
+  async function submitLocatorPayload(payload, runSource = "manual") {
+    const res = await fetch(`${API_BASE}/element-locator/report`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+
+    if (!res.ok) {
+      const text = await res.text();
+      throw new Error(`HTTP ${res.status}: ${text}`);
+    }
+
+    const json = await res.json();
+    setCurrentReport(json);
+    setHistory((prev) => {
+      const next = [
+        {
+          id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+          source: runSource,
+          input: payload,
+          output: json,
+        },
+        ...prev,
+      ];
+      return next.slice(0, 25);
+    });
+    return json;
+  }
+
   async function runTest() {
     setLoading(true);
     setError("");
@@ -178,31 +279,7 @@ function App() {
     };
 
     try {
-      const res = await fetch(`${API_BASE}/element-locator/report`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-
-      if (!res.ok) {
-        const text = await res.text();
-        throw new Error(`HTTP ${res.status}: ${text}`);
-      }
-
-      const json = await res.json();
-      setCurrentReport(json);
-
-      setHistory((prev) => {
-        const next = [
-          {
-            id: `${Date.now()}`,
-            input: payload,
-            output: json,
-          },
-          ...prev,
-        ];
-        return next.slice(0, 25); // keep latest 25
-      });
+      await submitLocatorPayload(payload, "manual");
     } catch (err) {
       console.error(err);
       setError(err.message || "Unknown error");
@@ -210,6 +287,51 @@ function App() {
       setLoading(false);
     }
   }
+
+  useEffect(() => {
+    let timerId;
+    let cancelled = false;
+
+    async function syncFromOrchestrator() {
+      try {
+        const res = await fetch(ORCHESTRATOR_STATUS_URL);
+        if (!res.ok) return;
+        const data = await res.json();
+        const nextFailures = Array.isArray(data?.failures) ? data.failures : [];
+
+        const chronological = [...nextFailures].reverse();
+        for (const failure of chronological) {
+          if (!shouldAutoRouteFailure(failure)) continue;
+          const key = `${failure.botId || "unknown"}:${failure.timestamp || 0}:${getFailureClassification(failure)}`;
+          if (routedFailuresRef.current[key]) continue;
+
+          routedFailuresRef.current[key] = true;
+          const payload = buildPayloadFromFailure(failure);
+          applyPayloadToForm(payload);
+
+          try {
+            await submitLocatorPayload(payload, "auto");
+          } catch (err) {
+            console.error("Auto locator execution failed:", err);
+          }
+        }
+      } catch {
+        // ignore orchestrator polling errors to keep dashboard responsive
+      }
+    }
+
+    syncFromOrchestrator();
+    timerId = setInterval(() => {
+      if (!cancelled) {
+        syncFromOrchestrator();
+      }
+    }, 3000);
+
+    return () => {
+      cancelled = true;
+      clearInterval(timerId);
+    };
+  }, []);
 
   const candidate = currentReport?.element_candidate;
   const score = candidate?.score ?? null;
@@ -283,6 +405,9 @@ function App() {
         <h1>AI Element Locator – Dashboard</h1>
         <p className="subtitle">
           AI-Powered Element Locator Engine
+        </p>
+        <p className="subtitle" style={{ marginTop: 6 }}>
+          Auto mode: classified orchestrator failures (UI_SELECTOR_CHANGED / ELEMENT_NOT_VISIBLE) run automatically
         </p>
       </header>
 
@@ -420,9 +545,9 @@ function App() {
             </small>
           </div>
 
-          <button className="btn-primary" onClick={runTest} disabled={loading}>
-            {loading ? "Running..." : "Run Locator Engine"}
-          </button>
+          <div className="metric-note" style={{ marginTop: 10 }}>
+            Auto execution enabled — classified orchestrator failures trigger locator engine automatically.
+          </div>
 
           {error && <div className="error">Error: {error}</div>}
         </section>
@@ -549,6 +674,7 @@ vision_screenshot : ${extra?.vision_screenshot ?? "N/A"}`}
                 <th>#</th>
                 <th>Expected Text</th>
                 <th>Old Locator</th>
+                <th>Source</th>
                 <th>Strategy</th>
                 <th>Score</th>
                 <th>Vision</th>
@@ -568,6 +694,7 @@ vision_screenshot : ${extra?.vision_screenshot ?? "N/A"}`}
                     <td>{history.length - idx}</td>
                     <td>{h.input.expected_text}</td>
                     <td className="mono">{h?.input?.old_locator ?? "-"}</td>
+                    <td>{h.source || "manual"}</td>
                     <td>{c?.strategy ?? "-"}</td>
                     <td>
                       {c?.score != null ? Number(c.score).toFixed(3) : "-"}
