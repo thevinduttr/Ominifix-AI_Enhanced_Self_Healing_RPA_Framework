@@ -9,6 +9,8 @@ function FailureModal({ failure, onClose }) {
   const healingRequest = failure?.healing_request || locatorReport?.healing_request
   const healingError = failure?.healing_error || locatorReport?.healing_error
   const healingSummary = healingResult?.healing_summary
+  const ptqaResult = failure?.ptqa_result
+  const ptqaError = failure?.ptqa_error
 
   const handleOverlayClick = (e) => {
     if (e.target.id === 'failure-overlay') {
@@ -74,6 +76,18 @@ function FailureModal({ failure, onClose }) {
     if (healingSummary?.validation?.reason)
       parts.push(['Healing Reason', healingSummary.validation.reason])
     if (healingError) parts.push(['Healing Error', healingError])
+
+    if (ptqaResult?.recommendation)
+      parts.push(['PTQA Recommendation', ptqaResult.recommendation])
+    if (ptqaResult?.risk_level) parts.push(['PTQA Risk', ptqaResult.risk_level])
+    if (typeof ptqaResult?.confidence === 'number')
+      parts.push(['PTQA Confidence', `${Math.round(ptqaResult.confidence * 100)}%`])
+    if (typeof ptqaResult?.will_work_probability === 'number')
+      parts.push([
+        'PTQA Will Work',
+        `${Math.round(ptqaResult.will_work_probability * 100)}%`,
+      ])
+    if (ptqaError) parts.push(['PTQA Error', ptqaError])
 
     parts.push(['Bot ID', failure.botId || ''])
     parts.push([
@@ -282,6 +296,28 @@ function FailureModal({ failure, onClose }) {
                 }}
               >
                 {JSON.stringify(healingRequest, null, 2)}
+              </pre>
+            </>
+          )}
+
+          {ptqaResult && (
+            <>
+              <div style={{ marginTop: '12px' }}>
+                <strong>PTQA Output</strong>
+              </div>
+              <pre
+                style={{
+                  marginTop: '8px',
+                  background: 'rgba(0,0,0,0.06)',
+                  padding: '12px',
+                  borderRadius: '6px',
+                  maxHeight: '360px',
+                  overflow: 'auto',
+                  color: '#e6eef8',
+                  fontSize: '13px',
+                }}
+              >
+                {JSON.stringify(ptqaResult, null, 2)}
               </pre>
             </>
           )}

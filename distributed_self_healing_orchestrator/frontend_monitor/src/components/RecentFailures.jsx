@@ -35,6 +35,18 @@ function RecentFailures({ failures, onFailureClick }) {
         if (f.healing_error || f.locator_report?.healing_error) {
           meta.push('Healing Error: yes')
         }
+        if (f.ptqa_result?.recommendation) {
+          meta.push(`PTQA: ${f.ptqa_result.recommendation}`)
+        }
+        if (f.ptqa_result?.risk_level) {
+          meta.push(`PTQA Risk: ${f.ptqa_result.risk_level}`)
+        }
+        if (typeof f.ptqa_result?.confidence === 'number') {
+          meta.push(`PTQA Confidence: ${Math.round(f.ptqa_result.confidence * 100)}%`)
+        }
+        if (f.ptqa_error) {
+          meta.push('PTQA Error: yes')
+        }
 
         const categoryBadge = f.category ? (
           <div style={{ marginLeft: '8px', display: 'inline-block' }}>
