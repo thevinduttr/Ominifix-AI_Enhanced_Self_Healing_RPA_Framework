@@ -103,8 +103,20 @@ services:
     build:
       context: ./ai_rpa_healing_engine
       dockerfile: Dockerfile
+    command: ["uvicorn", "src.api.app:app", "--host", "0.0.0.0", "--port", "8000"]
     ports:
-      - "8501:8501"
+      - "8501:8000"
+    restart: unless-stopped
+
+  ai_rpa_healing_ui:
+    build:
+      context: ./ai_rpa_healing_engine
+      dockerfile: Dockerfile
+    command: ["streamlit", "run", "src/ui/app.py", "--server.address=0.0.0.0", "--server.port=8601"]
+    ports:
+      - "8601:8601"
+    depends_on:
+      - ai_rpa_healing_engine
     restart: unless-stopped
 
   ptqa_service:
