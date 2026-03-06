@@ -9,6 +9,8 @@ MODEL_READ_TIMEOUT_SECONDS = float(os.environ.get("MODEL_READ_TIMEOUT_SECONDS", 
 MODEL_MAX_RETRIES = int(os.environ.get("MODEL_MAX_RETRIES", "2"))
 DEFAULT_LOCATOR_ENGINE_URL = os.environ.get('LOCATOR_ENGINE_URL', 'http://ai_element_locator:8001/element-locator/report')
 LOCATOR_READ_TIMEOUT_SECONDS = float(os.environ.get("LOCATOR_READ_TIMEOUT_SECONDS", "20"))
+DEFAULT_PTQA_URL = os.environ.get('PTQA_SERVICE_URL', 'http://ptqa_service:8000/ptqa/evaluate-healing')
+PTQA_READ_TIMEOUT_SECONDS = float(os.environ.get("PTQA_READ_TIMEOUT_SECONDS", "30"))
 
 # Current known bots and recent failures
 bots = {}
@@ -76,10 +78,41 @@ def _request_locator_report(failure):
             return
         report = resp.json()
         failure['locator_report'] = report
+        healing_result_payload = None
         if isinstance(report, dict):
             metadata = report.get('metadata') or {}
             if metadata.get('report_id'):
                 failure['locator_report_id'] = metadata.get('report_id')
+
+            # Carry healing details from locator->healing integration into orchestrator state.
+            if 'healing_request' in report:
+                failure['healing_request'] = report.get('healing_request')
+            if 'healing_result' in report:
+                failure['healing_result'] = report.get('healing_result')
+                healing_result_payload = report.get('healing_result')
+                hs = (report.get('healing_result') or {}).get('healing_summary') or {}
+                if hs.get('status'):
+                    failure['healing_status'] = hs.get('status')
+                if hs.get('new_locator'):
+                    failure['healed_locator'] = hs.get('new_locator')
+            if report.get('healing_error'):
+                failure['healing_error'] = report.get('healing_error')
+
+        # Forward healing engine output to PTQA automatically.
+        if healing_result_payload:
+            try:
+                ptqa_resp = requests.post(
+                    DEFAULT_PTQA_URL,
+                    json=healing_result_payload,
+                    timeout=(5, PTQA_READ_TIMEOUT_SECONDS),
+                )
+                if ptqa_resp.ok:
+                    failure['ptqa_result'] = ptqa_resp.json()
+                    failure['ptqa_error'] = None
+                else:
+                    failure['ptqa_error'] = f"HTTP {ptqa_resp.status_code}: {ptqa_resp.text[:300]}"
+            except Exception as ptqa_exc:
+                failure['ptqa_error'] = str(ptqa_exc)
 
         bid = failure.get('botId')
         if bid and bid in bots:
@@ -88,6 +121,20 @@ def _request_locator_report(failure):
                 b['last_error']['locator_report'] = failure.get('locator_report')
                 if failure.get('locator_report_id'):
                     b['last_error']['locator_report_id'] = failure.get('locator_report_id')
+                if 'healing_request' in failure:
+                    b['last_error']['healing_request'] = failure.get('healing_request')
+                if 'healing_result' in failure:
+                    b['last_error']['healing_result'] = failure.get('healing_result')
+                if failure.get('healing_status'):
+                    b['last_error']['healing_status'] = failure.get('healing_status')
+                if failure.get('healed_locator'):
+                    b['last_error']['healed_locator'] = failure.get('healed_locator')
+                if failure.get('healing_error'):
+                    b['last_error']['healing_error'] = failure.get('healing_error')
+                if 'ptqa_result' in failure:
+                    b['last_error']['ptqa_result'] = failure.get('ptqa_result')
+                if failure.get('ptqa_error'):
+                    b['last_error']['ptqa_error'] = failure.get('ptqa_error')
                 bots[bid] = b
     except Exception as e:
         failure['locator_error'] = str(e)

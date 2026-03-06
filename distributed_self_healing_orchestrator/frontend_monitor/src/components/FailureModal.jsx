@@ -5,6 +5,10 @@ function FailureModal({ failure, onClose }) {
   const [showDom, setShowDom] = useState(false)
   const soundLabel = (failure?.metadata && failure.metadata.sound) || 'Alert tone'
   const locatorReport = failure?.locator_report
+  const healingResult = failure?.healing_result || locatorReport?.healing_result
+  const healingRequest = failure?.healing_request || locatorReport?.healing_request
+  const healingError = failure?.healing_error || locatorReport?.healing_error
+  const healingSummary = healingResult?.healing_summary
 
   const handleOverlayClick = (e) => {
     if (e.target.id === 'failure-overlay') {
@@ -61,6 +65,15 @@ function FailureModal({ failure, onClose }) {
       parts.push(['Locator XPath', locatorReport.element_candidate.xpath])
     if (locatorReport?.element_candidate?.css)
       parts.push(['Locator CSS', locatorReport.element_candidate.css])
+
+    if (healingSummary?.status) parts.push(['Healing Status', healingSummary.status])
+    if (healingSummary?.strategy_used)
+      parts.push(['Healing Strategy', healingSummary.strategy_used])
+    if (healingSummary?.new_locator)
+      parts.push(['Healed Locator', healingSummary.new_locator])
+    if (healingSummary?.validation?.reason)
+      parts.push(['Healing Reason', healingSummary.validation.reason])
+    if (healingError) parts.push(['Healing Error', healingError])
 
     parts.push(['Bot ID', failure.botId || ''])
     parts.push([
@@ -225,6 +238,50 @@ function FailureModal({ failure, onClose }) {
                 }}
               >
                 {JSON.stringify(locatorReport, null, 2)}
+              </pre>
+            </>
+          )}
+
+          {healingResult && (
+            <>
+              <div style={{ marginTop: '12px' }}>
+                <strong>AI Healing Output</strong>
+              </div>
+              <pre
+                style={{
+                  marginTop: '8px',
+                  background: 'rgba(0,0,0,0.06)',
+                  padding: '12px',
+                  borderRadius: '6px',
+                  maxHeight: '360px',
+                  overflow: 'auto',
+                  color: '#e6eef8',
+                  fontSize: '13px',
+                }}
+              >
+                {JSON.stringify(healingResult, null, 2)}
+              </pre>
+            </>
+          )}
+
+          {healingRequest && (
+            <>
+              <div style={{ marginTop: '12px' }}>
+                <strong>Healing Request Body</strong>
+              </div>
+              <pre
+                style={{
+                  marginTop: '8px',
+                  background: 'rgba(0,0,0,0.06)',
+                  padding: '12px',
+                  borderRadius: '6px',
+                  maxHeight: '360px',
+                  overflow: 'auto',
+                  color: '#e6eef8',
+                  fontSize: '13px',
+                }}
+              >
+                {JSON.stringify(healingRequest, null, 2)}
               </pre>
             </>
           )}

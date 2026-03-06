@@ -24,6 +24,18 @@ function RecentFailures({ failures, onFailureClick }) {
         if (f.locator_report?.metadata?.report_id)
           meta.push(`Locator Report: ${f.locator_report.metadata.report_id}`)
 
+        const healingSummary =
+          f.healing_result?.healing_summary || f.locator_report?.healing_result?.healing_summary
+        if (healingSummary?.status) {
+          meta.push(`Healing: ${healingSummary.status}`)
+        }
+        if (healingSummary?.new_locator) {
+          meta.push(`Healed Locator: ${healingSummary.new_locator}`)
+        }
+        if (f.healing_error || f.locator_report?.healing_error) {
+          meta.push('Healing Error: yes')
+        }
+
         const categoryBadge = f.category ? (
           <div style={{ marginLeft: '8px', display: 'inline-block' }}>
             <span

@@ -22,10 +22,12 @@ from app.db.session import get_db
 from app.db.models_decisions import PTQADecision
 
 router = APIRouter()
+LATEST_EVALUATION = None
 
 
 @router.post("/evaluate-healing")
 def evaluate_healing(payload: dict, db: Session = Depends(get_db)):
+    global LATEST_EVALUATION
     # 0) Normalise input format (handles both PTQA native and Code Healing Engine formats)
     payload = _adapter.adapt(payload)
 
@@ -149,4 +151,14 @@ def evaluate_healing(payload: dict, db: Session = Depends(get_db)):
         existing.raw_payload = json.dumps(healing_event.get("raw_payload", {}))
 
     db.commit()
+
+    # Keep the latest full decision in memory for dashboard live updates.
+    LATEST_EVALUATION = decision
     return decision
+
+
+@router.get("/evaluate-healing/latest")
+def latest_evaluation():
+    if LATEST_EVALUATION is None:
+        return {"available": False, "decision": None}
+    return {"available": True, "decision": LATEST_EVALUATION}

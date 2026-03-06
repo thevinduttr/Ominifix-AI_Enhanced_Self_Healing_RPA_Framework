@@ -24,6 +24,14 @@ def report_page(healing_id: str, request: Request, db: Session = Depends(get_db)
     )
 
 
+@router.get("/dashboard/latest")
+def latest_run(db: Session = Depends(get_db)):
+    row = db.query(PTQADecision).order_by(PTQADecision.id.desc()).first()
+    if row is None:
+        return {"latest_row_id": None, "latest_healing_id": None}
+    return {"latest_row_id": row.id, "latest_healing_id": row.healing_id}
+
+
 # NEW: delete a single run by healing_id
 @router.delete("/dashboard/delete/{healing_id}")
 def delete_run(healing_id: str, db: Session = Depends(get_db)):

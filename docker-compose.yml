@@ -38,6 +38,8 @@ services:
     environment:
       MODEL_URL: https://rpa-error-classifier-555972249634.us-central1.run.app/predict
       RABBIT_HOST: rabbitmq
+      PTQA_SERVICE_URL: http://ptqa_service:8000/ptqa/evaluate-healing
+      PTQA_READ_TIMEOUT_SECONDS: 30
     depends_on:
       rabbitmq:
         condition: service_healthy
