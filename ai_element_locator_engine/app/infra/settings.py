@@ -20,6 +20,10 @@ class Settings(BaseSettings):
     # Logging
     LOG_LEVEL: str = "INFO"
 
+    # Downstream healing engine integration
+    HEALING_ENGINE_URL: str = "http://ai_rpa_healing_engine:8000/api/v1/heal"
+    HEALING_ENGINE_TIMEOUT_SECONDS: float = 20.0
+
     class Config:
         env_file = ".env"
         env_file_encoding = "utf-8"

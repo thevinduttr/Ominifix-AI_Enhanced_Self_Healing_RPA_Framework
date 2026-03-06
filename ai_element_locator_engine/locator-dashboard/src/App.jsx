@@ -14,6 +14,8 @@ import {
 
 const API_BASE =
   import.meta.env.VITE_API_BASE_URL?.trim() || "http://127.0.0.1:8001";
+const HEALING_API_BASE =
+  import.meta.env.VITE_HEALING_API_BASE_URL?.trim() || "http://127.0.0.1:8501";
 const ORCHESTRATOR_STATUS_URL =
   import.meta.env.VITE_ORCHESTRATOR_STATUS_URL?.trim() || "/orchestrator/status";
 const HISTORY_KEY = "locator_dashboard_history";
@@ -143,6 +145,9 @@ function App() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [currentReport, setCurrentReport] = useState(null);
+  const [currentHealingPayload, setCurrentHealingPayload] = useState(null);
+  const [currentHealingResult, setCurrentHealingResult] = useState(null);
+  const [healingError, setHealingError] = useState("");
   const [history, setHistory] = useState([]);
   const routedFailuresRef = useRef({});
 
@@ -217,6 +222,8 @@ function App() {
         ...(failure.metadata || {}),
         source: "distributed_self_healing_orchestrator",
         bot_id: failure.botId || null,
+        script_path: failure.script_path || failure.scriptPath || null,
+        failing_line: failure.failing_line || failure.failingLine || null,
         classification: getFailureClassification(failure),
         auto_routed: true,
       },
@@ -259,13 +266,113 @@ function App() {
       ];
       return next.slice(0, 25);
     });
+
+    const healingPayload = buildHealingPayload(payload, json);
+    setCurrentHealingPayload(healingPayload);
+
+    try {
+      const healingResult = await submitHealingPayload(healingPayload);
+      setCurrentHealingResult(healingResult);
+      setHealingError("");
+    } catch (err) {
+      setCurrentHealingResult(null);
+      setHealingError(err.message || "Healing request failed");
+    }
+
     return json;
+  }
+
+  function buildHealingPayload(locatorPayload, locatorReport) {
+    const reportMeta = locatorReport?.metadata || {};
+    const reportFailure = locatorReport?.failure_context || {};
+    const reportDom = locatorReport?.dom_context || {};
+    const reportExpectation = locatorReport?.element_expectation || {};
+    const reportCandidate = locatorReport?.element_candidate || null;
+    const inboundMeta = locatorPayload?.metadata || {};
+
+    const failingLineRaw =
+      reportFailure?.failing_line ?? inboundMeta?.failing_line ?? 1;
+    const failingLine = Number.isFinite(Number(failingLineRaw))
+      ? Number(failingLineRaw)
+      : 1;
+
+    return {
+      metadata: {
+        schema_version: "1.0",
+        report_id: reportMeta?.report_id || `ELR-AUTO-${Date.now()}`,
+        run_id: reportMeta?.run_id || `RUN-AUTO-${Date.now()}`,
+        bot_id: inboundMeta?.bot_id || "DASHBOARD-BOT",
+        timestamp: new Date().toISOString(),
+        source_component: "element_locator_engine_dashboard",
+        target_component: "code_healing_engine",
+        environment: "docker",
+      },
+      failure_context: {
+        script_path:
+          reportFailure?.script_path ||
+          inboundMeta?.script_path ||
+          "data/scripts/broken/auto_generated.py",
+        failing_line: failingLine,
+        action: reportFailure?.action || locatorPayload?.failed_action || "click",
+        old_locator: reportFailure?.old_locator || locatorPayload?.old_locator || "",
+        error_type:
+          reportFailure?.error_type ||
+          locatorPayload?.failure_type ||
+          "ELEMENT_NOT_FOUND",
+        error_message:
+          reportFailure?.error_message ||
+          locatorPayload?.error_message ||
+          "Auto forwarded from ai_element_locator_engine",
+      },
+      dom_context: {
+        new_element_html:
+          reportDom?.new_element_html || locatorPayload?.page_html || "",
+        page_url: reportDom?.page_url || locatorPayload?.page_url || "",
+        page_name: reportDom?.page_name || inboundMeta?.page_name || "",
+      },
+      element_expectation: {
+        expected_role:
+          reportExpectation?.expected_role || locatorPayload?.element_role || "",
+        expected_text:
+          reportExpectation?.expected_text || locatorPayload?.expected_text || "",
+      },
+      element_candidate: reportCandidate
+        ? {
+            css: reportCandidate?.css || null,
+            xpath: reportCandidate?.xpath || null,
+            full_xpath: reportCandidate?.full_xpath || null,
+            score:
+              reportCandidate?.score != null
+                ? Math.round(Number(reportCandidate.score) * 1000) / 10
+                : null,
+            strategy: reportCandidate?.strategy || null,
+          }
+        : null,
+    };
+  }
+
+  async function submitHealingPayload(payload) {
+    const res = await fetch(`${HEALING_API_BASE}/api/v1/heal`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+
+    if (!res.ok) {
+      const text = await res.text();
+      throw new Error(`Healing API HTTP ${res.status}: ${text}`);
+    }
+
+    return res.json();
   }
 
   async function runTest() {
     setLoading(true);
     setError("");
     setCurrentReport(null);
+    setCurrentHealingPayload(null);
+    setCurrentHealingResult(null);
+    setHealingError("");
 
     const payload = {
       page_url: pageUrl,
@@ -617,6 +724,47 @@ vision_screenshot : ${extra?.vision_screenshot ?? "N/A"}`}
                   {JSON.stringify(currentReport, null, 2)}
                 </pre>
               </details>
+
+              <details style={{ marginTop: 10 }} open>
+                <summary
+                  style={{ cursor: "pointer", fontWeight: 700, opacity: 0.9 }}
+                >
+                  Auto Healing Request (sent to ai_rpa_healing_engine)
+                </summary>
+                <pre className="code small">
+                  {JSON.stringify(currentHealingPayload, null, 2)}
+                </pre>
+              </details>
+
+              {healingError && (
+                <div className="error" style={{ marginTop: 12 }}>
+                  Healing Error: {healingError}
+                </div>
+              )}
+
+              {currentHealingResult && (
+                <div style={{ marginTop: 12 }}>
+                  <h3>Healing Engine Result</h3>
+                  <pre className="code small">
+{`Status: ${currentHealingResult?.healing_summary?.status ?? "N/A"}
+Strategy: ${currentHealingResult?.healing_summary?.strategy_used ?? "N/A"}
+Old Locator: ${currentHealingResult?.healing_summary?.old_locator ?? "N/A"}
+New Locator: ${currentHealingResult?.healing_summary?.new_locator ?? "N/A"}
+Reason: ${currentHealingResult?.healing_summary?.validation?.reason ?? "N/A"}`}
+                  </pre>
+
+                  <details style={{ marginTop: 10 }}>
+                    <summary
+                      style={{ cursor: "pointer", fontWeight: 700, opacity: 0.9 }}
+                    >
+                      Raw Healing JSON
+                    </summary>
+                    <pre className="code small">
+                      {JSON.stringify(currentHealingResult, null, 2)}
+                    </pre>
+                  </details>
+                </div>
+              )}
             </>
           )}
 

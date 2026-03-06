@@ -81,6 +81,9 @@ services:
     build:
       context: ./ai_element_locator_engine
       dockerfile: Dockerfile
+    environment:
+      - HEALING_ENGINE_URL=http://ai_rpa_healing_engine:8000/api/v1/heal
+      - HEALING_ENGINE_TIMEOUT_SECONDS=20
     ports:
       - "8001:8001"
     depends_on:
@@ -92,6 +95,7 @@ services:
       dockerfile: Dockerfile
     environment:
       - VITE_API_BASE_URL=http://localhost:8001
+      - VITE_HEALING_API_BASE_URL=http://localhost:8501
       - ORCHESTRATOR_PROXY_TARGET=http://orchestrator_monitor:8000
     ports:
       - "5173:5173"
@@ -112,6 +116,8 @@ services:
     build:
       context: ./ai_rpa_healing_engine
       dockerfile: Dockerfile
+    environment:
+      - HEALING_API_BASE_URL=http://ai_rpa_healing_engine:8000
     command: ["streamlit", "run", "src/ui/app.py", "--server.address=0.0.0.0", "--server.port=8601"]
     ports:
       - "8601:8601"

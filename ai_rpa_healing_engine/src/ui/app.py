@@ -4,8 +4,11 @@ import json
 import sys
 from pathlib import Path
 from datetime import datetime
+import os
+import time
 
 import streamlit as st
+import httpx
 
 # ---- Fix ModuleNotFoundError: src ----
 THIS_FILE = Path(__file__).resolve()
@@ -35,7 +38,30 @@ st.markdown(
 st.title("🩹 Ominifix — AI-Enhanced Code Healing Engine")
 st.caption(f"Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}  |  Root: {PROJECT_ROOT}")
 
-tabs = st.tabs(["🧩 Single Heal", "📦 Batch", "ℹ️ About"])
+HEALING_API_CANDIDATES = [
+    os.environ.get("HEALING_API_BASE_URL", "").strip(),
+    "http://ai_rpa_healing_engine:8000",
+    "http://localhost:8501",
+]
+
+
+def fetch_latest_heal_event() -> dict | None:
+    for base in HEALING_API_CANDIDATES:
+        if not base:
+            continue
+        url = f"{base.rstrip('/')}/api/v1/heal/latest"
+        try:
+            with httpx.Client(timeout=2.5) as client:
+                res = client.get(url)
+            if res.status_code != 200:
+                continue
+            data = res.json()
+            if data.get("available"):
+                return data
+        except Exception:
+            continue
+    return None
+
 
 def read_json(p: Path) -> dict:
     return json.loads(p.read_text(encoding="utf-8"))
@@ -74,6 +100,44 @@ def status_badge(status: str):
     else:
         st.info("ℹ️ NO_FIX")
 
+
+st.markdown("### 🔄 Live Healing Monitor")
+auto_refresh = st.toggle("Auto refresh latest healing", value=True)
+latest_event = fetch_latest_heal_event()
+
+if latest_event:
+    latest_response = latest_event.get("response", {})
+    latest_summary = summarize(latest_response)
+    st.success("Latest healing event received automatically from API")
+    status_badge(latest_summary.get("status"))
+    st.write({
+        "bot_id": latest_summary.get("bot_id"),
+        "status": latest_summary.get("status"),
+        "strategy": latest_summary.get("strategy_used"),
+        "new_locator": latest_summary.get("new_locator"),
+        "reason": latest_summary.get("reason"),
+    })
+
+    latest_request = latest_event.get("request")
+    if latest_request:
+        st.session_state["auto_input_json"] = json.dumps(latest_request, indent=2)
+
+        st.markdown("#### Full Request Body")
+        st.json(latest_request)
+    else:
+        st.warning("Latest event has no request body.")
+
+    with st.expander("Latest healing response JSON"):
+        st.json(latest_response)
+else:
+    st.info("No automatic healing event yet.")
+
+if auto_refresh:
+    time.sleep(3)
+    st.rerun()
+
+tabs = st.tabs(["🧩 Single Heal", "📦 Batch", "ℹ️ About"])
+
 # -------------------------
 # TAB 1: SINGLE HEAL
 # -------------------------
@@ -89,7 +153,7 @@ with tabs[0]:
 
         if mode == "Paste JSON":
             st.markdown("<div class='muted'>Paste the ELR JSON input here.</div>", unsafe_allow_html=True)
-            default_text = """{
+            default_text = st.session_state.get("auto_input_json", """{
   "metadata": {
     "report_id": "ELR-SLIIT-001",
     "run_id": "RUN-PP1-INT-01",
@@ -115,8 +179,8 @@ with tabs[0]:
     "expected_role": "tablist",
     "expected_text": "Online Programs"
   }
-}"""
-            raw = st.text_area("ELR Input JSON", value=default_text, height=360)
+}""")
+            raw = st.text_area("ELR Input JSON", value=default_text, height=360, key="paste_input_json")
             if raw.strip():
                 try:
                     input_dict = json.loads(raw)

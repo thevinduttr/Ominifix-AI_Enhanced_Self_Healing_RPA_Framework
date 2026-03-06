@@ -40,6 +40,9 @@ logging.basicConfig(
 )
 logger = logging.getLogger("healing_api")
 
+# In-memory latest event for dashboard polling.
+LATEST_HEAL_EVENT: dict[str, Any] | None = None
+
 # ──────────────────────────────────────────────
 # App
 # ──────────────────────────────────────────────
@@ -182,6 +185,18 @@ async def health_check():
     )
 
 
+@app.get(
+    "/api/v1/heal/latest",
+    summary="Get Latest Healing Event",
+    tags=["Healing"],
+)
+async def heal_latest():
+    """Returns the most recent /api/v1/heal request + result for live dashboards."""
+    if LATEST_HEAL_EVENT is None:
+        return {"available": False}
+    return {"available": True, **LATEST_HEAL_EVENT}
+
+
 @app.post(
     "/api/v1/heal",
     response_model=HealResponse,
@@ -204,6 +219,8 @@ async def heal_single(elr_input: ELRInput):
     start = time.time()
 
     try:
+        global LATEST_HEAL_EVENT
+
         # Convert Pydantic model → plain dict for the engine
         inp_dict = elr_input.model_dump(exclude_none=False)
 
@@ -238,6 +255,12 @@ async def heal_single(elr_input: ELRInput):
             result.get("healing_summary", {}).get("confidence", 0),
             result.get("healing_summary", {}).get("new_locator", ""),
         )
+
+        LATEST_HEAL_EVENT = {
+            "timestamp": time.time(),
+            "request": inp_dict,
+            "response": result,
+        }
 
         return result
 
