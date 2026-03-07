@@ -15,6 +15,35 @@ HEALABLE_ERRORS = {
     "NOT_ENABLED",
 }
 
+# -- Input normalization maps --------------------------------------------------
+# The Element Locator Engine dashboard may use different action / error names.
+# Map them to internal Playwright-based identifiers so the pipeline accepts them.
+
+ACTION_ALIASES: dict[str, str] = {
+    "locate_element": "locator",
+    "locate": "locator",
+    "find_element": "locator",
+    "select": "click",
+}
+
+ERROR_ALIASES: dict[str, str] = {
+    "UI_SELECTOR_CHANGED": "ELEMENT_NOT_FOUND",
+    "SELECTOR_CHANGED": "ELEMENT_NOT_FOUND",
+    "SELECTOR_NOT_FOUND": "ELEMENT_NOT_FOUND",
+}
+
+
+def normalize_action(raw: str) -> str:
+    """Map upstream action names to internal Playwright method names."""
+    action = (raw or "").strip().lower()
+    return ACTION_ALIASES.get(action, action)
+
+
+def normalize_error(raw: str) -> str:
+    """Map upstream error names to internal healable error types."""
+    error = (raw or "").strip().upper()
+    return ERROR_ALIASES.get(error, error)
+
 
 @dataclass
 class NoFix:
@@ -23,8 +52,8 @@ class NoFix:
 
 def decide(inp: dict) -> NoFix | None:
     fc = inp.get("failure_context", {})
-    action = (fc.get("action") or "").strip().lower()
-    error = (fc.get("error_type") or "").strip().upper()
+    action = normalize_action(fc.get("action") or "")
+    error = normalize_error(fc.get("error_type") or "")
     dom = inp.get("dom_context", {})
 
     if action and action not in SUPPORTED_ACTIONS:
@@ -79,7 +108,7 @@ def base_output(inp: dict) -> dict:
         "healing_summary": {
             "status": "NO_FIX",
             "strategy_used": "NO_FIX",
-            "action": (fc.get("action") or "").strip().lower(),
+            "action": normalize_action(fc.get("action") or ""),
             "old_locator": fc.get("old_locator", ""),
             "new_locator": "",
             "confidence": 0.0,

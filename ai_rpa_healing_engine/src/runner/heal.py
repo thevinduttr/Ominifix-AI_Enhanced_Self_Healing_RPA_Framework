@@ -17,7 +17,7 @@ from pathlib import Path
 
 from src.utils.path_manager import PathManager
 from src.utils.script_path_resolver import resolve_script_path
-from src.engine.healing_router import decide, base_output
+from src.engine.healing_router import decide, base_output, normalize_action, normalize_error
 from src.ml.strategy_predictor import StrategyPredictor
 from src.locator_gen.locator_generator import LocatorGenerator
 from src.patcher.libcst_patcher import ScriptPatcher
@@ -32,6 +32,70 @@ MODEL_PATH = "models/strategy_selector_v1.pkl"
 MIN_CONFIDENCE_AGGRESSIVE = 0.70   # Use any best candidate
 MIN_CONFIDENCE_CONSERVATIVE = 0.50  # ID-based only
 # Below 0.50 = NO_FIX
+
+
+def _auto_generate_script(script_path: Path, action: str, old_locator: str,
+                          page_url: str = "",
+                          failing_line: int = 1) -> None:
+    """Generate a full Playwright script when the referenced original doesn't exist.
+
+    Upstream systems (e.g. Element Locator Engine dashboard) may reference a
+    script that hasn't been created yet.  This builds a complete, runnable
+    Playwright script with the old locator call placed on the exact
+    *failing_line* so the LibCST patcher can find and replace it.
+
+    The healed output will therefore be a full executable script, not a stub.
+    """
+    script_path.parent.mkdir(parents=True, exist_ok=True)
+    esc = old_locator.replace('\\', '\\\\').replace('"', '\\"')
+    url = page_url or "https://example.com"
+
+    # Build the target action line
+    if action == "fill":
+        action_line = f'        page.fill("{esc}", "value")'
+    elif action == "click":
+        action_line = f'        page.click("{esc}")'
+    elif action == "wait_for_selector":
+        action_line = f'        page.wait_for_selector("{esc}")'
+    elif action == "query_selector_all":
+        action_line = f'        page.query_selector_all("{esc}")'
+    else:
+        # locator (default)
+        action_line = f'        page.locator("{esc}")'
+
+    # Construct lines so the action sits at the correct failing_line
+    header = [
+        'from playwright.sync_api import sync_playwright',
+        '',
+        '',
+        'def run():',
+        '    with sync_playwright() as p:',
+        '        browser = p.chromium.launch(headless=True)',
+        '        page = browser.new_page()',
+        '',
+        f'        page.goto("{url}")',
+        '',
+        '        # TARGET_LINE: auto-generated for code healing engine',
+    ]
+    footer = [
+        '',
+        '        browser.close()',
+        '',
+        '',
+        'if __name__ == "__main__":',
+        '    run()',
+        '',
+    ]
+
+    # If failing_line is within the header, adjust; otherwise pad to reach it
+    target_idx = max(failing_line - 1, len(header))  # 0-based line index
+    all_lines = list(header)
+    while len(all_lines) < target_idx:
+        all_lines.append('')
+    all_lines.append(action_line)
+    all_lines.extend(footer)
+
+    script_path.write_text('\n'.join(all_lines) + '\n', encoding="utf-8")
 
 
 def load_json(p: Path) -> dict:
@@ -67,14 +131,28 @@ def heal_from_dict(inp: dict, *, persist: bool = True) -> dict:
 
     out = base_output(inp)
 
+    # Normalize action and error for internal processing
+    norm_action = normalize_action(fc.get("action") or "")
+    norm_error = normalize_error(fc.get("error_type") or "")
+
     # Resolve original script path using input + RPA_ROOT
     script_path_in = fc.get("script_path", "")
     resolved_script = resolve_script_path(script_path_in)
 
+    # Auto-generate stub script if the original doesn't exist
+    if not resolved_script.exists():
+        _auto_generate_script(
+            resolved_script,
+            norm_action,
+            fc.get("old_locator", ""),
+            page_url=dom.get("page_url", ""),
+            failing_line=int(fc.get("failing_line", 1)),
+        )
+
     # Model prediction (always for traceability)
     predictor = StrategyPredictor(MODEL_PATH)
     pred = predictor.predict(
-        fc.get("error_type", ""),
+        norm_error,
         fc.get("old_locator", ""),
         dom.get("new_element_html", "")
     )
@@ -87,7 +165,8 @@ def heal_from_dict(inp: dict, *, persist: bool = True) -> dict:
         out["healing_summary"]["validation"] = {
             "valid": True,
             "reason": (
-                f"Original script not found. input script_path='{script_path_in}'. "
+                f"Original script not found and auto-generation failed. "
+                f"input script_path='{script_path_in}'. "
                 f"resolved='{resolved_script}'. Set env var RPA_ROOT to RPA repo root."
             )
         }
@@ -110,7 +189,12 @@ def heal_from_dict(inp: dict, *, persist: bool = True) -> dict:
 
     # Generate locator candidates from DOM
     lg = LocatorGenerator()
-    candidates = lg.generate_candidates(dom.get("new_element_html", ""))
+    exp = inp.get("element_expectation", {}) or {}
+    candidates = lg.generate_candidates(
+        dom.get("new_element_html", ""),
+        expected_text=exp.get("expected_text", ""),
+        expected_role=exp.get("expected_role", ""),
+    )
 
     # Merge upstream element_candidate if provided (from Element Locator Engine)
     element_candidate = inp.get("element_candidate")
@@ -132,11 +216,37 @@ def heal_from_dict(inp: dict, *, persist: bool = True) -> dict:
     # ========================================
     # CONFIDENCE-AWARE HEALING GATE
     # ========================================
-    # Strategy: balance automation with safety based on ML confidence
-    
-    if pred.confidence >= MIN_CONFIDENCE_AGGRESSIVE:
+    # Strategy: balance automation with safety based on ML confidence.
+    # Special overrides (bypass ML confidence):
+    #   1) ID-based selectors (score >= 95): unique by definition.
+    #   2) Expectation-based selectors (text=, role=): directly derived
+    #      from element_expectation, so they target the caller's intent.
+    # This avoids false-negative NO_FIX results when the ML model
+    # receives a full-page DOM it wasn't trained on.
+
+    best_value = best.get("value", "")
+    best_is_id = (
+        best_value.startswith("#")
+        or (best.get("type") == "css" and "#" in best_value.split("[", 1)[0])
+    )
+    best_is_expectation = (
+        best_value.startswith("text=")
+        or best_value.startswith("role=")
+    )
+
+    if best_is_id and best.get("score", 0) >= 95:
+        # ID-based selectors are unique by definition — always safe
+        selected_locator = best_value
+        healing_mode = "id_override"
+
+    elif best_is_expectation and best.get("score", 0) >= 95:
+        # Expectation-based locators derived from element_expectation — safe
+        selected_locator = best_value
+        healing_mode = "expectation_override"
+
+    elif pred.confidence >= MIN_CONFIDENCE_AGGRESSIVE:
         # High confidence: use best candidate (aggressive healing)
-        selected_locator = best.get("value", "")
+        selected_locator = best_value
         healing_mode = "aggressive"
     
     elif pred.confidence >= MIN_CONFIDENCE_CONSERVATIVE:
@@ -144,8 +254,7 @@ def heal_from_dict(inp: dict, *, persist: bool = True) -> dict:
         healing_mode = "conservative"
         
         # Check if best candidate is ID-based
-        best_value = best.get("value", "")
-        if best_value.startswith("#") or (best.get("type") == "css" and "#" in best_value.split("[", 1)[0]):
+        if best_is_id:
             # Safe: ID-based selector
             selected_locator = best_value
         else:
@@ -169,7 +278,7 @@ def heal_from_dict(inp: dict, *, persist: bool = True) -> dict:
             return out
     
     else:
-        # Low confidence: reject healing (NO_FIX)
+        # Low confidence and non-ID selector: reject healing (NO_FIX)
         out["healing_summary"]["status"] = "NO_FIX"
         out["healing_summary"]["strategy_used"] = "NO_FIX"
         out["healing_summary"]["old_locator"] = fc.get("old_locator", "")
@@ -188,7 +297,7 @@ def heal_from_dict(inp: dict, *, persist: bool = True) -> dict:
             save_json(output_json_path, out)
         return out
 
-    # Patch script
+    # Patch script (use normalized action so patcher recognises it)
     patcher = ScriptPatcher()
     patch_result = patcher.patch_locator(
         script_path=str(resolved_script),
@@ -196,8 +305,9 @@ def heal_from_dict(inp: dict, *, persist: bool = True) -> dict:
         failing_line=int(fc.get("failing_line", 0)),
         old_locator=fc.get("old_locator", ""),
         new_locator=selected_locator,
-        action=(fc.get("action") or "").strip().lower(),
+        action=norm_action,
     )
+
 
     if patch_result.status != "SUCCESS":
         out["healing_summary"]["status"] = "FAILED"

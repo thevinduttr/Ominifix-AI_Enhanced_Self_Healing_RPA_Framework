@@ -35,13 +35,15 @@
 The **Code Healing Engine** is the self-healing component of the OmniiFix framework. When an RPA bot fails due to a broken element locator (e.g., a CSS selector or XPath changed on a website), this engine:
 
 1. **Receives** an ELR (Element Locator Report) JSON — via REST API or CLI
-2. **Predicts** the best healing strategy using an ML classifier (TF-IDF + Random Forest)
-3. **Generates** new locator candidates from the updated DOM HTML
-4. **Merges** upstream `element_candidate` hints if provided (optional)
-5. **Applies** confidence-aware healing gates (aggressive / conservative / no-fix)
-6. **Patches** the broken RPA script with the correct new locator (using LibCST)
-7. **Validates** the healed script (Python syntax check)
-8. **Returns** a complete healing output JSON as the API response
+2. **Normalizes** upstream action/error names to internal Playwright identifiers (e.g. `locate_element` → `locator`, `UI_SELECTOR_CHANGED` → `ELEMENT_NOT_FOUND`)
+3. **Auto-generates** a stub script if the referenced `script_path` doesn't exist yet
+4. **Predicts** the best healing strategy using an ML classifier (TF-IDF + Random Forest)
+5. **Generates** new locator candidates from the updated DOM HTML
+6. **Merges** upstream `element_candidate` hints if provided (optional)
+7. **Applies** confidence-aware healing gates (aggressive / conservative / no-fix)
+8. **Patches** the broken RPA script with the correct new locator (using LibCST)
+9. **Validates** the healed script (Python syntax check)
+10. **Returns** a complete healing output JSON as the API response
 
 ```
 ┌─────────────────────┐         POST /api/v1/heal         ┌──────────────────────┐
@@ -659,7 +661,7 @@ When required fields are missing:
 
 ### 11.1 Supported Error Types
 
-These are the error types the engine can heal:
+These are the **internal** error types the engine can heal:
 
 | Error Type | Description |
 |---|---|
@@ -669,6 +671,18 @@ These are the error types the engine can heal:
 | `DETACHED_FROM_DOM` | Element was removed from DOM during interaction |
 | `NOT_VISIBLE` | Element exists but is not visible |
 | `NOT_ENABLED` | Element exists but is disabled |
+
+#### Error Type Aliases (auto-normalized)
+
+Upstream systems (e.g. Element Locator Engine dashboard) may use different error names. The engine **automatically normalizes** them:
+
+| Upstream Error | Normalized To |
+|---|---|
+| `UI_SELECTOR_CHANGED` | `ELEMENT_NOT_FOUND` |
+| `SELECTOR_CHANGED` | `ELEMENT_NOT_FOUND` |
+| `SELECTOR_NOT_FOUND` | `ELEMENT_NOT_FOUND` |
+
+You can send either the upstream or internal name — both will work.
 
 ### 11.2 Supported Actions
 
@@ -680,7 +694,47 @@ These are the error types the engine can heal:
 | `query_selector_all` | Query multiple elements |
 | `locator` | Playwright locator chain |
 
-**Unsupported actions** will return `NO_FIX` with a reason message.
+#### Action Aliases (auto-normalized)
+
+Upstream systems may use different action names. The engine **automatically normalizes** them:
+
+| Upstream Action | Normalized To |
+|---|---|
+| `locate_element` | `locator` |
+| `locate` | `locator` |
+| `find_element` | `locator` |
+| `select` | `click` |
+
+You can send either the upstream or internal name — both will work.
+
+**Unsupported actions** (after normalization) will return `NO_FIX` with a reason message.
+
+### 11.3 Auto-Generated Stub Scripts
+
+If `failure_context.script_path` points to a file that **does not exist**, the engine will automatically generate a minimal stub script. For example, if the input has:
+
+```json
+{
+  "failure_context": {
+    "script_path": "data/scripts/broken/auto_generated.py",
+    "failing_line": 1,
+    "action": "locate_element",
+    "old_locator": ".nonExistentClass"
+  }
+}
+```
+
+The engine creates `auto_generated.py` with:
+```python
+page.locator(".nonExistentClass")
+```
+
+Then patches it to produce the healed version:
+```python
+page.locator("#submit-btn")
+```
+
+This allows the Element Locator Engine dashboard to send healing requests without needing to pre-create script files.
 
 ---
 
@@ -1086,10 +1140,10 @@ Once the server is running, open these URLs in your browser:
 | `422 Unprocessable Entity` | Missing required fields | Ensure `metadata.bot_id`, all `failure_context` fields, and `dom_context.new_element_html` are present |
 | `500 Internal Server Error` | Engine crash | Check terminal logs; ensure `models/strategy_selector_v1.pkl` exists |
 | `Connection refused` | Server not running | Start with `uvicorn src.api.app:app --port 8000` |
-| `NO_FIX: "Original script not found"` | Bad `script_path` | Set `RPA_ROOT` env var or use a path relative to `ai_rpa_healing_engine/` |
+| `NO_FIX: "Original script not found"` | Script path doesn't exist and auto-generation failed | Ensure the path is relative to `ai_rpa_healing_engine/`. The engine auto-creates stub scripts, so this is rare. |
 | `NO_FIX: "Missing new_element_html"` | Empty DOM snippet | Provide the current HTML of the target element |
-| `NO_FIX: "Error type not healable"` | Unsupported error | Use one from Section 11 |
-| `NO_FIX: "Action not supported"` | Unsupported action | Use: `click`, `fill`, `wait_for_selector`, `query_selector_all`, `locator` |
+| `NO_FIX: "Error type not healable"` | Unsupported error (after normalization) | Use one from Section 11, or an alias like `UI_SELECTOR_CHANGED` |
+| `NO_FIX: "Action not supported"` | Unsupported action (after normalization) | Use: `click`, `fill`, `wait_for_selector`, `query_selector_all`, `locator`, or aliases like `locate_element` |
 | `NO_FIX: "ML confidence below threshold"` | Low confidence | Provide better `new_element_html` with `id` attributes for higher accuracy |
 | Port already in use | Another process on 8000 | Use `--port 8001` or kill the existing process |
 | Module not found | Dependencies not installed | Run `pip install -r requirements.txt` |

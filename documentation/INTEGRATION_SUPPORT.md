@@ -818,6 +818,16 @@ Bot C fails  →  ELR with bot_id="BOT-C"  →  output: data/outbox/.../BOT-C/..
 | `NOT_VISIBLE` | Element exists in DOM but not visible |
 | `NOT_ENABLED` | Element exists but is disabled |
 
+#### Error Type Aliases (auto-normalized)
+
+The engine automatically maps upstream error names to internal types:
+
+| Upstream Error | Normalized To |
+|---|---|
+| `UI_SELECTOR_CHANGED` | `ELEMENT_NOT_FOUND` |
+| `SELECTOR_CHANGED` | `ELEMENT_NOT_FOUND` |
+| `SELECTOR_NOT_FOUND` | `ELEMENT_NOT_FOUND` |
+
 ### Supported Playwright Actions
 
 | Action | Description |
@@ -828,9 +838,24 @@ Bot C fails  →  ELR with bot_id="BOT-C"  →  output: data/outbox/.../BOT-C/..
 | `query_selector_all` | `page.query_selector_all(selector)` |
 | `locator` | `page.locator(selector)` |
 
+#### Action Aliases (auto-normalized)
+
+The engine automatically maps upstream action names to internal Playwright methods:
+
+| Upstream Action | Normalized To |
+|---|---|
+| `locate_element` | `locator` |
+| `locate` | `locator` |
+| `find_element` | `locator` |
+| `select` | `click` |
+
+### Auto-Generated Stub Scripts
+
+If `failure_context.script_path` points to a file that **does not exist**, the engine automatically creates a minimal stub script with the old locator placed at the specified `failing_line`. This enables the Element Locator Engine dashboard to send healing requests without pre-creating script files.
+
 ### What Happens with Unsupported Errors/Actions
 
-If the error type is not in the supported list, or the action is not supported, the engine returns `NO_FIX` with a clear reason:
+If the error type is not in the supported list (and has no alias), or the action is not supported (and has no alias), the engine returns `NO_FIX` with a clear reason:
 
 ```json
 {
