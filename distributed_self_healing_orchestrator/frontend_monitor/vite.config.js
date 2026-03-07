@@ -13,6 +13,11 @@ export default defineConfig({
       '/element-locator': {
         target: 'http://localhost:8001',
         changeOrigin: true
+      },
+      '/healing-direct': {
+        target: 'http://localhost:8501',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/healing-direct/, '/api/v1/heal')
       }
     }
   }

@@ -76,7 +76,7 @@ app.add_middleware(
 class Metadata(BaseModel):
     model_config = ConfigDict(extra="allow")
 
-    bot_id: str = Field(..., description="Unique bot identifier, e.g. BOT-ECOMMERCE-01")
+    bot_id: str = Field(default="", description="Unique bot identifier, e.g. BOT-ECOMMERCE-01")
     run_id: str = Field(default="", description="Run identifier")
     report_id: str = Field(default="", description="ELR report identifier")
     schema_version: str = Field(default="1.0", description="Input schema version")
@@ -89,8 +89,8 @@ class Metadata(BaseModel):
 class FailureContext(BaseModel):
     model_config = ConfigDict(extra="allow")
 
-    script_path: str = Field(..., description="Path to the broken RPA script")
-    failing_line: int = Field(..., description="Line number that failed")
+    script_path: str | None = Field(default="", description="Path to the broken RPA script")
+    failing_line: int | None = Field(default=1, description="Line number that failed")
     action: str = Field(..., description="Playwright action: click, fill, goto, etc.")
     old_locator: str = Field(..., description="The broken CSS/XPath selector")
     error_type: str = Field(..., description="ELEMENT_NOT_FOUND, TIMEOUT, etc.")
@@ -102,7 +102,7 @@ class DomContext(BaseModel):
 
     new_element_html: str = Field(..., description="Current DOM snippet of the target element")
     page_url: str = Field(default="", description="URL where failure occurred")
-    page_name: str = Field(default="", description="Friendly page label")
+    page_name: str | None = Field(default="", description="Friendly page label")
 
 
 class ElementExpectation(BaseModel):
@@ -229,6 +229,19 @@ async def heal_single(elr_input: ELRInput):
             if inp_dict.get(key) is None:
                 inp_dict[key] = {}
 
+        # Normalize nullable leaf fields from upstream ELR payloads.
+        fc = inp_dict.get("failure_context", {})
+        dc = inp_dict.get("dom_context", {})
+        md = inp_dict.get("metadata", {})
+        if fc.get("script_path") is None:
+            fc["script_path"] = ""
+        if fc.get("failing_line") is None:
+            fc["failing_line"] = 1
+        if dc.get("page_name") is None:
+            dc["page_name"] = ""
+        if md.get("bot_id") is None:
+            md["bot_id"] = ""
+
         # Handle element_candidate: strip None-valued fields, collapse to None if empty
         if inp_dict.get("element_candidate") is not None:
             inp_dict["element_candidate"] = {
@@ -300,6 +313,18 @@ async def heal_batch(batch: BatchRequest):
             for key in ("metadata", "failure_context", "dom_context", "element_expectation"):
                 if inp_dict.get(key) is None:
                     inp_dict[key] = {}
+
+            fc = inp_dict.get("failure_context", {})
+            dc = inp_dict.get("dom_context", {})
+            md = inp_dict.get("metadata", {})
+            if fc.get("script_path") is None:
+                fc["script_path"] = ""
+            if fc.get("failing_line") is None:
+                fc["failing_line"] = 1
+            if dc.get("page_name") is None:
+                dc["page_name"] = ""
+            if md.get("bot_id") is None:
+                md["bot_id"] = ""
 
             if inp_dict.get("element_candidate") is not None:
                 inp_dict["element_candidate"] = {

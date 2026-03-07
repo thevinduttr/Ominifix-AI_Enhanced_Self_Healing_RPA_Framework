@@ -106,6 +106,20 @@ services:
     depends_on:
       - orchestrator_monitor
 
+  bot_logic_error:
+    build:
+      context: .
+      dockerfile: dummy_bot/Dockerfile
+    container_name: ominifix_bot_logic_error
+    command: ["python", "bot_logic_error.py"]
+    environment:
+      - MONITOR_URL=http://orchestrator_monitor:8000/heartbeat
+      - BOT_ID=BOT-AUTH-ERROR-001
+      - FAILURE_EVERY=4
+      - HEARTBEAT_INTERVAL=3
+    depends_on:
+      - orchestrator_monitor
+
 volumes:
   rabbitmq_data:
     name: ominifix_rabbitmq_data

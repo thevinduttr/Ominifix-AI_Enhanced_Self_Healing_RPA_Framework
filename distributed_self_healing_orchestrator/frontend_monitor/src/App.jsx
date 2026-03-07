@@ -2,7 +2,11 @@ import { useState, useEffect, useRef } from 'react'
 import Header from './components/Header'
 import BotsTable from './components/BotsTable'
 import ChartsPanel from './components/ChartsPanel'
-import { fetchBotStatus, sendToElementLocatorEngine } from './services/api'
+import {
+  fetchBotStatus,
+  sendToElementLocatorEngine,
+  sendToHealingEngineDirect,
+} from './services/api'
 
 const ERROR_TYPE_BY_ID = {
   '0': 'UI_SELECTOR_CHANGED',
@@ -80,6 +84,17 @@ const SOUND_PROFILES = {
     variant: 'generic',
   },
 }
+
+const HEALING_TRIGGER_TYPES = new Set([
+  'UI_SELECTOR_CHANGED',
+  'ELEMENT_NOT_VISIBLE',
+  'APPLICATION_UPDATE',
+  'BOT_LOGIC_ERROR',
+  'ENV_CONFIG_ERROR',
+  'AUTHENTICATION_ERROR',
+])
+
+const DIRECT_HEALING_TYPES = new Set(['AUTHENTICATION_ERROR'])
 
 function App() {
   const [bots, setBots] = useState({})
@@ -268,33 +283,63 @@ function App() {
         showSnackbar(`Failure detected · ${label}: ${message}`, profile.variant)
       }
 
-      const shouldSendToLocator =
-        currentCategory === 'UI_SELECTOR_CHANGED' ||
-        currentCategory === 'ELEMENT_NOT_VISIBLE'
-      const sendKey = `${key}:${currentCategory}`
+      const shouldSendToLocator = HEALING_TRIGGER_TYPES.has(currentCategory)
+      const shouldDirectToHealing = DIRECT_HEALING_TYPES.has(currentCategory)
+      const route = shouldDirectToHealing ? 'direct-healing' : 'locator'
+      const sendKey = `${key}:${currentCategory}:${route}`
       if (shouldSendToLocator && !locatorSentRef.current[sendKey]) {
         locatorSentRef.current[sendKey] = true
-        sendToElementLocatorEngine(failure)
+        const sender = shouldDirectToHealing
+          ? sendToHealingEngineDirect(failure)
+          : sendToElementLocatorEngine(failure)
+
+        sender
           .then((locatorReport) => {
-            locatorReportByFailureKeyRef.current[key] = locatorReport
+            const locatorReportForState = shouldDirectToHealing
+              ? {
+                  metadata: {
+                    report_id: `DIRECT-${Date.now()}`,
+                    run_id: failure?.metadata?.run_id || '',
+                    timestamp: new Date().toISOString(),
+                    source_component: 'frontend_monitor',
+                    target_component: 'code_healing_engine',
+                  },
+                  healing_result: locatorReport,
+                  healing_error: null,
+                }
+              : locatorReport
+
+            locatorReportByFailureKeyRef.current[key] = locatorReportForState
             setFailures((prev) =>
               prev.map((item) => {
                 const itemKey = getFailureKey(item)
                 if (itemKey !== key) return item
                 return {
                   ...item,
-                  locator_report: locatorReport,
+                  locator_report: locatorReportForState,
+                  healing_result: shouldDirectToHealing ? locatorReport : item.healing_result,
+                  healing_error: null,
                   metadata: {
                     ...(item.metadata || {}),
-                    locator_report_id: locatorReport?.metadata?.report_id || null,
+                    locator_report_id: locatorReportForState?.metadata?.report_id || null,
                   },
                 }
               })
             )
-            showSnackbar('AI locator report received', 'generic')
+            showSnackbar(
+              shouldDirectToHealing
+                ? 'Authentication error sent directly to healing engine'
+                : 'AI locator report received',
+              'generic'
+            )
           })
           .catch((err) => {
-            console.error('Error sending failure to element locator engine:', err)
+            console.error(
+              shouldDirectToHealing
+                ? 'Error sending failure directly to healing engine:'
+                : 'Error sending failure to element locator engine:',
+              err
+            )
           })
       }
 

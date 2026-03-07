@@ -6,7 +6,7 @@ COPY orchestrator-monitor /app
 # Copy trained/demo models into container at /models (model_server expects /app/../models)
 COPY models /models
 
-RUN pip install --no-cache-dir fastapi uvicorn[standard] requests pika joblib pandas scikit-learn scipy
+RUN pip install --no-cache-dir fastapi uvicorn[standard] requests pika joblib pandas scikit-learn scipy docker
 
 EXPOSE 8000 8002
 

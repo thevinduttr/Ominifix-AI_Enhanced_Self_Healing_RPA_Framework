@@ -40,6 +40,9 @@ services:
       RABBIT_HOST: rabbitmq
       PTQA_SERVICE_URL: http://ptqa_service:8000/ptqa/evaluate-healing
       PTQA_READ_TIMEOUT_SECONDS: 30
+      RESTART_ON_CATEGORIES: TIMEOUT_ERROR,NETWORK_ERROR,UNKNOWN,BOT_ERROR
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
     depends_on:
       rabbitmq:
         condition: service_healthy
@@ -155,6 +158,19 @@ services:
     depends_on:
       - orchestrator_monitor
 
+  bot_logic_error:
+    build:
+      context: ./distributed_self_healing_orchestrator
+      dockerfile: dummy_bot/Dockerfile
+    command: ["python", "bot_logic_error.py"]
+    environment:
+      - MONITOR_URL=http://orchestrator_monitor:8000/heartbeat
+      - BOT_ID=BOT-AUTH-ERROR-001
+      - FAILURE_EVERY=4
+      - HEARTBEAT_INTERVAL=3
+    depends_on:
+      - orchestrator_monitor
+
   sliit_pdp_rpa_bot:
     build:
       context: ./sliit_pdp_rpa
@@ -169,7 +185,7 @@ services:
     depends_on:
       - orchestrator_monitor
       - ai_element_locator
-    restart: unless-stopped
+    restart: "no"
 
 volumes:
   rabbitmq_data:
