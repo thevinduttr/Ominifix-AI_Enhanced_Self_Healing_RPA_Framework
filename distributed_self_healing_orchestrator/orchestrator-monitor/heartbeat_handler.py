@@ -27,6 +27,12 @@ RESTART_ON_CATEGORIES = {
 bots = {}
 failures = []  # list of failure dicts with details
 _docker_client = None
+PTQA_APPROVED_RECOMMENDATIONS = {
+    "APPROVE_HEALING",
+    "APPROVED",
+    "APPROVE",
+    "ALLOW",
+}
 
 
 def _get_docker_client():
@@ -70,6 +76,69 @@ def _restart_bot_for_category(failure):
         failure['bot_restart_error'] = None
     except Exception as e:
         failure['bot_restart_error'] = str(e)
+
+
+def _find_container_for_bot(bot_id):
+    """Resolve container by compose service name first, then BOT_ID env fallback."""
+    client = _get_docker_client()
+
+    # Fast path: botId matches compose service name.
+    direct = client.containers.list(
+        all=True,
+        filters={"label": f"com.docker.compose.service={bot_id}"},
+    )
+    if direct:
+        return direct[0]
+
+    # Fallback: search compose containers by BOT_ID env.
+    compose_containers = client.containers.list(
+        all=True,
+        filters={"label": "com.docker.compose.project"},
+    )
+    target_env = f"BOT_ID={bot_id}"
+    for container in compose_containers:
+        envs = ((container.attrs.get("Config") or {}).get("Env") or [])
+        if target_env in envs:
+            return container
+
+    return None
+
+
+def _restart_bot_on_ptqa_approval(failure, ptqa_result):
+    if not isinstance(ptqa_result, dict):
+        return
+
+    recommendation = str(ptqa_result.get('recommendation') or '').strip().upper()
+    if recommendation not in PTQA_APPROVED_RECOMMENDATIONS:
+        return
+
+    bot_id = failure.get('botId') or (failure.get('metadata') or {}).get('bot_id')
+    if not bot_id:
+        failure['ptqa_restart_error'] = 'missing botId'
+        return
+
+    try:
+        container = _find_container_for_bot(bot_id)
+        if container is None:
+            failure['ptqa_restart_error'] = f"no container found for botId '{bot_id}'"
+            return
+
+        service_name = (container.labels or {}).get('com.docker.compose.service') or container.name
+        container.restart(timeout=10)
+
+        failure['ptqa_restart'] = {
+            'requested': True,
+            'trigger': 'PTQA_APPROVED',
+            'recommendation': recommendation,
+            'bot_id': bot_id,
+            'service': service_name,
+            'container': container.name,
+            'timestamp': time.time(),
+            'status': 'restarted',
+        }
+        failure['ptqa_restart_error'] = None
+    except Exception as e:
+        failure['ptqa_restart_error'] = str(e)
 
 
 def _normalize_locator_category(raw_value):
@@ -164,6 +233,7 @@ def _request_locator_report(failure):
                 if ptqa_resp.ok:
                     failure['ptqa_result'] = ptqa_resp.json()
                     failure['ptqa_error'] = None
+                    _restart_bot_on_ptqa_approval(failure, failure['ptqa_result'])
                 else:
                     failure['ptqa_error'] = f"HTTP {ptqa_resp.status_code}: {ptqa_resp.text[:300]}"
             except Exception as ptqa_exc:
@@ -190,6 +260,10 @@ def _request_locator_report(failure):
                     b['last_error']['ptqa_result'] = failure.get('ptqa_result')
                 if failure.get('ptqa_error'):
                     b['last_error']['ptqa_error'] = failure.get('ptqa_error')
+                if 'ptqa_restart' in failure:
+                    b['last_error']['ptqa_restart'] = failure.get('ptqa_restart')
+                if failure.get('ptqa_restart_error'):
+                    b['last_error']['ptqa_restart_error'] = failure.get('ptqa_restart_error')
                 bots[bid] = b
     except Exception as e:
         failure['locator_error'] = str(e)
@@ -265,6 +339,7 @@ def _request_direct_healing(failure):
             if ptqa_resp.ok:
                 failure['ptqa_result'] = ptqa_resp.json()
                 failure['ptqa_error'] = None
+                _restart_bot_on_ptqa_approval(failure, failure['ptqa_result'])
             else:
                 failure['ptqa_error'] = f"HTTP {ptqa_resp.status_code}: {ptqa_resp.text[:300]}"
         except Exception as ptqa_exc:
@@ -285,6 +360,10 @@ def _request_direct_healing(failure):
                     b['last_error']['ptqa_result'] = failure.get('ptqa_result')
                 if failure.get('ptqa_error'):
                     b['last_error']['ptqa_error'] = failure.get('ptqa_error')
+                if 'ptqa_restart' in failure:
+                    b['last_error']['ptqa_restart'] = failure.get('ptqa_restart')
+                if failure.get('ptqa_restart_error'):
+                    b['last_error']['ptqa_restart_error'] = failure.get('ptqa_restart_error')
                 bots[bid] = b
     except Exception as e:
         failure['healing_error'] = str(e)

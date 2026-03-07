@@ -120,6 +120,22 @@ services:
     depends_on:
       - orchestrator_monitor
 
+  bot_element_not_found_real:
+    build:
+      context: .
+      dockerfile: dummy_bot/Dockerfile
+    container_name: ominifix_bot_element_not_found_real
+    command: ["python", "bot_element_not_found_real.py"]
+    environment:
+      - MONITOR_URL=http://orchestrator_monitor:8000/heartbeat
+      - BOT_ID=BOT-REAL-ELEMENT-NOT-FOUND-001
+      - HEARTBEAT_INTERVAL=3
+      - FAILURE_EVERY=4
+      - TARGET_URL=https://www.wikipedia.org/
+      - MISSING_SELECTOR=#non_existing_checkout_button
+    depends_on:
+      - orchestrator_monitor
+
 volumes:
   rabbitmq_data:
     name: ominifix_rabbitmq_data

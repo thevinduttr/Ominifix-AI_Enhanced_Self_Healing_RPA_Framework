@@ -171,6 +171,21 @@ services:
     depends_on:
       - orchestrator_monitor
 
+  bot_element_not_found_real:
+    build:
+      context: ./distributed_self_healing_orchestrator
+      dockerfile: dummy_bot/Dockerfile
+    command: ["python", "bot_element_not_found_real.py"]
+    environment:
+      - MONITOR_URL=http://orchestrator_monitor:8000/heartbeat
+      - BOT_ID=BOT-REAL-ELEMENT-NOT-FOUND-001
+      - HEARTBEAT_INTERVAL=3
+      - FAILURE_EVERY=4
+      - TARGET_URL=https://www.wikipedia.org/
+      - MISSING_SELECTOR=#non_existing_checkout_button
+    depends_on:
+      - orchestrator_monitor
+
   sliit_pdp_rpa_bot:
     build:
       context: ./sliit_pdp_rpa
@@ -179,6 +194,24 @@ services:
       - PYTHONUNBUFFERED=1
       - ORCHESTRATOR_URL=http://orchestrator_monitor:8000
       - ORCHESTRATOR_ENABLED=true
+    volumes:
+      - ./sliit_pdp_rpa/outputs:/app/sliit_pdp_rpa/outputs
+      - ./sliit_pdp_rpa/logs:/app/sliit_pdp_rpa/logs
+    depends_on:
+      - orchestrator_monitor
+      - ai_element_locator
+    restart: "no"
+
+  sliit_pdp_rpa_element_not_found_bot:
+    build:
+      context: ./sliit_pdp_rpa
+      dockerfile: Dockerfile
+    command: ["python", "src/element_not_found_bot.py"]
+    environment:
+      - PYTHONUNBUFFERED=1
+      - MONITOR_URL=http://orchestrator_monitor:8000
+      - BOT_ID=BOT-REAL-ELEMENT-NOT-FOUND-001
+      - HEARTBEAT_INTERVAL=3
     volumes:
       - ./sliit_pdp_rpa/outputs:/app/sliit_pdp_rpa/outputs
       - ./sliit_pdp_rpa/logs:/app/sliit_pdp_rpa/logs
