@@ -1,87 +1,259 @@
-pycache/
-__pycache__/
-.pyc
-.venv/
-venv/
-.env
-# ===============================
-# Python
-# ===============================
+# ============================================
+# Python & Virtual Environment
+# ============================================
 __pycache__/
 *.py[cod]
-*.pyo
-*.pyd
+*$py.class
 *.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+pip-wheel-metadata/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
 
-# Virtual environment
+# Virtual Environments
 .venv/
 venv/
-env/
-
-# ===============================
-# Playwright
-# ===============================
-playwright/.cache/
-.playwright/
-test-results/
-playwright-report/
-
-# ===============================
-# ML Models & Large Files
-# ===============================
-models/*.pkl
-models/*.joblib
-models/*.h5
-models/*.onnx
-
-# ===============================
-# Data (Generated / Runtime)
-# ===============================
-data/logs/
-data/inbox/
-data/dom_snapshots/
-data/synthetic_outputs/
-data/scripts/healed/
-data/ml/
-*.csv
-*.parquet
-
-# ===============================
-# Notebooks
-# ===============================
-.ipynb_checkpoints/
-
-# ===============================
-# Git / OS
-# ===============================
-.DS_Store
-*.egg-info
-.pytest_cache/
 ENV/
-*.pyc
-Thumbs.db
+env/
+.env
+.env.local
+.env.*.local
 
-# ===============================
-# IDE / Editor
-# ===============================
+# ============================================
+# IDE & Editor Files
+# ============================================
 .vscode/
 .idea/
-*.iml
+*.swp
+*.swo
+*~
+.DS_Store
+*.sublime-project
+*.sublime-workspace
+.project
+.pydevproject
+.settings/
+*.code-workspace
+.vs/
+.vscode-settings.json
 
-# ===============================
-# Logs
-# ===============================
+# ============================================
+# Testing & Coverage
+# ============================================
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.hypothesis/
+*.cover
 *.log
+coverage.xml
+*.prof
+test-results/
+.nox/
 
-# ===============================
-# Temporary / Backup
-# ===============================
+# ============================================
+# Playwright & Browser Automation
+# ============================================
+# Downloaded browser binaries (environment-specific)
+.cache/
+downloads/
+**/chromium/
+**/firefox/
+**/webkit/
+**/ms-playwright/
+
+# Test execution artifacts
+playwright-videos/
+test-results/
+**/*.video.webm
+**/*.trace
+**/*.webm
+
+# ============================================
+# Selenium & WebDriver
+# ============================================
+chromedriver
+geckodriver
+edgedriver
+**/drivers/
+webdriver/
+
+# ============================================
+# Machine Learning Models & Scalers
+# ============================================
+*.pkl
+*.joblib
+*.model
+models/trained_*
+models/**/*.pkl
+models/**/*.joblib
+**/__pycache__/
+*.h5
+*.pt
+*.pth
+scaler_*.pkl
+encoder_*.pkl
+label_encoder_*.pkl
+xgboost_*.pkl
+
+# ============================================
+# Data & Logs
+# ============================================
+logs/
+*.log
+app.log
+error.log
+*.csv
+data/raw/
+data/processed/
+data/temp/
+**/*training_data*
+**/*test_data*
+**/logs/
+bots/logs/
+bots/*.log
+bots/**/execution_logs/
+
+# ============================================
+# RPA Execution Artifacts
+# ============================================
+bots/logs/
+bots/*.log
+bots/**/execution_logs/
+bots/**/screenshots/
+bots/**/videos/
+videos/
+screenshots/
+healing_history/
+bot_outputs/
+execution_reports/
+ptqa_service/logs/
+ptqa_service/**/screenshots/
+ptqa_service/**/videos/
+
+# ============================================
+# Database & Cache
+# ============================================
+*.db
+*.sqlite
+*.sqlite3
+redis.conf
+.cache/
+cache/
+tmp/
+temp/
+.tmp/
+
+# ============================================
+# Configuration & Secrets (CRITICAL)
+# ============================================
+.env
+.env.local
+.env.*.local
+.env.production
+secrets/
+config/secrets.json
+config/credentials.json
+api_keys.txt
+**/*config*.local.*
+**/*secrets*
+**/*password*
+.aws/credentials
+.aws/config
+.gcloud/
+
+# ============================================
+# Docker & Containerization
+# ============================================
+.dockerignore
+docker-compose.override.yml
+.docker/
+
+# ============================================
+# Temporary & Backup Files
+# ============================================
 *.tmp
+*.temp
 *.bak
 *.swp
+*.orig
+.DS_Store
+Thumbs.db
+*.lnk
+.AppleDouble
+.LSOverride
 
-# ===============================
-# Kaggle
-# ===============================
-kaggle.json
-*.json
+# ============================================
+# OS Specific
+# ============================================
+.DS_Store
+Thumbs.db
+*.lnk
+.AppleDouble
+.LSOverride
+desktop.ini
+
+# ============================================
+# Node (if using npm for frontend dashboard)
+# ============================================
+node_modules/
+npm-debug.log
+yarn-error.log
+package-lock.json
+yarn.lock
+dist/
+
+# ============================================
+# Jupyter Notebooks (if used)
+# ============================================
+.ipynb_checkpoints/
+*.ipynb
+
+# ============================================
+# Build Artifacts
+# ============================================
+build/
+dist/
+*.egg-info/
+.eggs/
+*.whl
+
+# ============================================
+# Large Files
+# ============================================
+*.zip
+*.tar.gz
+*.7z
+large_datasets/
+*.tar
+*.rar
+
+# ============================================
+# IDE Run Configurations
+# ============================================
+.run/
+
+# ============================================
+# Misc
+# ============================================
+.mypy_cache/
+.dmypy.json
+dmypy.json
+.pyre/
+.ruff_cache/

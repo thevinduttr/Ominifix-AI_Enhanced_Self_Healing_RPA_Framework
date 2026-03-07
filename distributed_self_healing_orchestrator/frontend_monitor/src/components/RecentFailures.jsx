@@ -21,6 +21,32 @@ function RecentFailures({ failures, onFailureClick }) {
         if (f.category) meta.push(`Classified: ${f.category}`)
         const soundLabel = (f.metadata && f.metadata.sound) || 'Alert tone'
         if (f.category || f.failure_type) meta.push(`Sound: ${soundLabel}`)
+        if (f.locator_report?.metadata?.report_id)
+          meta.push(`Locator Report: ${f.locator_report.metadata.report_id}`)
+
+        const healingSummary =
+          f.healing_result?.healing_summary || f.locator_report?.healing_result?.healing_summary
+        if (healingSummary?.status) {
+          meta.push(`Healing: ${healingSummary.status}`)
+        }
+        if (healingSummary?.new_locator) {
+          meta.push(`Healed Locator: ${healingSummary.new_locator}`)
+        }
+        if (f.healing_error || f.locator_report?.healing_error) {
+          meta.push('Healing Error: yes')
+        }
+        if (f.ptqa_result?.recommendation) {
+          meta.push(`PTQA: ${f.ptqa_result.recommendation}`)
+        }
+        if (f.ptqa_result?.risk_level) {
+          meta.push(`PTQA Risk: ${f.ptqa_result.risk_level}`)
+        }
+        if (typeof f.ptqa_result?.confidence === 'number') {
+          meta.push(`PTQA Confidence: ${Math.round(f.ptqa_result.confidence * 100)}%`)
+        }
+        if (f.ptqa_error) {
+          meta.push('PTQA Error: yes')
+        }
 
         const categoryBadge = f.category ? (
           <div style={{ marginLeft: '8px', display: 'inline-block' }}>

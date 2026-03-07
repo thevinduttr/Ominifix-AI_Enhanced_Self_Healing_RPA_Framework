@@ -7,13 +7,22 @@ class DatasetLogger:
     """
     Logs healing decisions into a CSV dataset for ML training.
     Includes strict label integrity checks to keep the dataset clean.
+    
+    Strategy labels (5-class taxonomy):
+      - LOCATOR_REGEN_LIBCST: ID-based healing (highest confidence)
+      - FALLBACK_LOCATOR: Attribute-based healing (aria-label, placeholder, name)
+      - FALLBACK_XPATH: XPath-based healing (no CSS-friendly attributes)
+      - CLICK_ONLY: Specialized click action healing (buttons, links)
+      - NO_FIX: Unfixable failures (empty DOM, unsafe conditions)
     """
 
     ALLOWED_STRATEGIES = {
         "LOCATOR_REGEN_LIBCST",
-        "WAIT_RETRY",
         "FALLBACK_LOCATOR",
+        "FALLBACK_XPATH",
+        "CLICK_ONLY",
         "TEMPLATE_REPAIR",
+        "WAIT_RETRY",
         "NO_FIX",
     }
 
@@ -49,7 +58,7 @@ class DatasetLogger:
         confidence: float,
         outcome: str,
         element_html: str,
-    ):
+    ) -> None:
         # ✅ Label integrity check
         if strategy not in self.ALLOWED_STRATEGIES:
             raise ValueError(

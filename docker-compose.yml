@@ -38,6 +38,11 @@ services:
     environment:
       MODEL_URL: https://rpa-error-classifier-555972249634.us-central1.run.app/predict
       RABBIT_HOST: rabbitmq
+      PTQA_SERVICE_URL: http://ptqa_service:8000/ptqa/evaluate-healing
+      PTQA_READ_TIMEOUT_SECONDS: 30
+      RESTART_ON_CATEGORIES: TIMEOUT_ERROR,NETWORK_ERROR,UNKNOWN,BOT_ERROR
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
     depends_on:
       rabbitmq:
         condition: service_healthy
@@ -81,6 +86,9 @@ services:
     build:
       context: ./ai_element_locator_engine
       dockerfile: Dockerfile
+    environment:
+      - HEALING_ENGINE_URL=http://ai_rpa_healing_engine:8000/api/v1/heal
+      - HEALING_ENGINE_TIMEOUT_SECONDS=20
     ports:
       - "8001:8001"
     depends_on:
@@ -92,6 +100,8 @@ services:
       dockerfile: Dockerfile
     environment:
       - VITE_API_BASE_URL=http://localhost:8001
+      - VITE_HEALING_API_BASE_URL=http://localhost:8501
+      - ORCHESTRATOR_PROXY_TARGET=http://orchestrator_monitor:8000
     ports:
       - "5173:5173"
     depends_on:
@@ -102,8 +112,22 @@ services:
     build:
       context: ./ai_rpa_healing_engine
       dockerfile: Dockerfile
+    command: ["uvicorn", "src.api.app:app", "--host", "0.0.0.0", "--port", "8000"]
     ports:
-      - "8501:8501"
+      - "8501:8000"
+    restart: unless-stopped
+
+  ai_rpa_healing_ui:
+    build:
+      context: ./ai_rpa_healing_engine
+      dockerfile: Dockerfile
+    environment:
+      - HEALING_API_BASE_URL=http://ai_rpa_healing_engine:8000
+    command: ["streamlit", "run", "src/ui/app.py", "--server.address=0.0.0.0", "--server.port=8601"]
+    ports:
+      - "8601:8601"
+    depends_on:
+      - ai_rpa_healing_engine
     restart: unless-stopped
 
   ptqa_service:
@@ -134,6 +158,19 @@ services:
     depends_on:
       - orchestrator_monitor
 
+  bot_logic_error:
+    build:
+      context: ./distributed_self_healing_orchestrator
+      dockerfile: dummy_bot/Dockerfile
+    command: ["python", "bot_logic_error.py"]
+    environment:
+      - MONITOR_URL=http://orchestrator_monitor:8000/heartbeat
+      - BOT_ID=BOT-AUTH-ERROR-001
+      - FAILURE_EVERY=4
+      - HEARTBEAT_INTERVAL=3
+    depends_on:
+      - orchestrator_monitor
+
   sliit_pdp_rpa_bot:
     build:
       context: ./sliit_pdp_rpa
@@ -148,7 +185,7 @@ services:
     depends_on:
       - orchestrator_monitor
       - ai_element_locator
-    restart: unless-stopped
+    restart: "no"
 
 volumes:
   rabbitmq_data:

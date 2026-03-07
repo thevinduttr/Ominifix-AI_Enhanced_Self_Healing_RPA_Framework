@@ -2,15 +2,306 @@ import time
 import threading
 import os
 import requests
+import docker
 from mq import publish_failure_event
 
 DEFAULT_MODEL_URL = "https://rpa-error-classifier-555972249634.us-central1.run.app/predict"
 MODEL_READ_TIMEOUT_SECONDS = float(os.environ.get("MODEL_READ_TIMEOUT_SECONDS", "20"))
 MODEL_MAX_RETRIES = int(os.environ.get("MODEL_MAX_RETRIES", "2"))
+DEFAULT_LOCATOR_ENGINE_URL = os.environ.get('LOCATOR_ENGINE_URL', 'http://ai_element_locator:8001/element-locator/report')
+LOCATOR_READ_TIMEOUT_SECONDS = float(os.environ.get("LOCATOR_READ_TIMEOUT_SECONDS", "20"))
+DEFAULT_HEALING_ENGINE_URL = os.environ.get('HEALING_ENGINE_URL', 'http://ai_rpa_healing_engine:8000/api/v1/heal')
+HEALING_READ_TIMEOUT_SECONDS = float(os.environ.get("HEALING_READ_TIMEOUT_SECONDS", "30"))
+DEFAULT_PTQA_URL = os.environ.get('PTQA_SERVICE_URL', 'http://ptqa_service:8000/ptqa/evaluate-healing')
+PTQA_READ_TIMEOUT_SECONDS = float(os.environ.get("PTQA_READ_TIMEOUT_SECONDS", "30"))
+RESTART_ON_CATEGORIES = {
+    c.strip().upper()
+    for c in os.environ.get(
+        "RESTART_ON_CATEGORIES",
+        "TIMEOUT_ERROR,NETWORK_ERROR,UNKNOWN,BOT_ERROR",
+    ).split(",")
+    if c.strip()
+}
 
 # Current known bots and recent failures
 bots = {}
 failures = []  # list of failure dicts with details
+_docker_client = None
+
+
+def _get_docker_client():
+    global _docker_client
+    if _docker_client is None:
+        _docker_client = docker.from_env()
+    return _docker_client
+
+
+def _restart_bot_for_category(failure):
+    category = (failure.get('category') or '').strip().upper()
+    if category not in RESTART_ON_CATEGORIES:
+        return
+
+    bot_id = failure.get('botId') or (failure.get('metadata') or {}).get('bot_id')
+    if not bot_id:
+        failure['bot_restart_error'] = 'missing botId'
+        return
+
+    try:
+        client = _get_docker_client()
+        containers = client.containers.list(
+            all=True,
+            filters={"label": f"com.docker.compose.service={bot_id}"},
+        )
+        if not containers:
+            failure['bot_restart_error'] = f"no compose service container found for '{bot_id}'"
+            return
+
+        # Restart first matched compose service container.
+        container = containers[0]
+        container.restart(timeout=10)
+        failure['bot_restart'] = {
+            'requested': True,
+            'category': category,
+            'service': bot_id,
+            'container': container.name,
+            'timestamp': time.time(),
+            'status': 'restarted',
+        }
+        failure['bot_restart_error'] = None
+    except Exception as e:
+        failure['bot_restart_error'] = str(e)
+
+
+def _normalize_locator_category(raw_value):
+    if raw_value is None:
+        return 'UNKNOWN'
+    raw = str(raw_value).strip()
+    normalized = raw.upper().replace(' ', '_')
+    aliases = {
+        'ELEMENTNOTFOUND': 'ELEMENT_NOT_VISIBLE',
+        'ELEMENT_NOT_FOUND': 'ELEMENT_NOT_VISIBLE',
+        'NO_SUCH_ELEMENT': 'ELEMENT_NOT_VISIBLE',
+        'ELEMENTNOTINTERACTABLE': 'ELEMENT_NOT_VISIBLE',
+        'STALEELEMENTREFERENCE': 'UI_SELECTOR_CHANGED',
+    }
+    return aliases.get(normalized, normalized)
+
+
+def _should_send_to_locator(failure):
+    category = failure.get('category')
+    if category and str(category).strip().lower() not in {'pending', 'unknown'}:
+        current = category
+    else:
+        current = failure.get('failure_type')
+    normalized = _normalize_locator_category(current)
+    return normalized in {'UI_SELECTOR_CHANGED', 'ELEMENT_NOT_VISIBLE'}
+
+
+def _build_locator_payload(failure):
+    metadata = failure.get('metadata') or {}
+    return {
+        'page_url': failure.get('page_url') or 'about:blank',
+        'failure_type': failure.get('failure_type') or failure.get('category') or 'ELEMENT_NOT_VISIBLE',
+        'failed_action': failure.get('failed_action') or failure.get('last_action') or 'click',
+        'element_role': failure.get('element_role'),
+        'expected_text': failure.get('expected_text'),
+        'old_locator': failure.get('old_locator'),
+        'old_locator_type': failure.get('old_locator_type'),
+        'error_message': failure.get('error') or failure.get('error_message') or 'Failure detected',
+        'page_html': failure.get('page_html') or failure.get('dom'),
+        'screenshot_path': failure.get('screenshot_path'),
+        'template_path': failure.get('template_path'),
+        'metadata': {
+            **metadata,
+            'source': 'distributed_self_healing_orchestrator',
+            'bot_id': failure.get('botId') or metadata.get('bot_id'),
+            'classification': failure.get('category') or failure.get('failure_type'),
+        }
+    }
+
+
+def _request_locator_report(failure):
+    payload = _build_locator_payload(failure)
+    try:
+        resp = requests.post(
+            DEFAULT_LOCATOR_ENGINE_URL,
+            json=payload,
+            timeout=(5, LOCATOR_READ_TIMEOUT_SECONDS),
+        )
+        if not resp.ok:
+            failure['locator_error'] = f"HTTP {resp.status_code}: {resp.text[:200]}"
+            return
+        report = resp.json()
+        failure['locator_report'] = report
+        healing_result_payload = None
+        if isinstance(report, dict):
+            metadata = report.get('metadata') or {}
+            if metadata.get('report_id'):
+                failure['locator_report_id'] = metadata.get('report_id')
+
+            # Carry healing details from locator->healing integration into orchestrator state.
+            if 'healing_request' in report:
+                failure['healing_request'] = report.get('healing_request')
+            if 'healing_result' in report:
+                failure['healing_result'] = report.get('healing_result')
+                healing_result_payload = report.get('healing_result')
+                hs = (report.get('healing_result') or {}).get('healing_summary') or {}
+                if hs.get('status'):
+                    failure['healing_status'] = hs.get('status')
+                if hs.get('new_locator'):
+                    failure['healed_locator'] = hs.get('new_locator')
+            if report.get('healing_error'):
+                failure['healing_error'] = report.get('healing_error')
+
+        # Forward healing engine output to PTQA automatically.
+        if healing_result_payload:
+            try:
+                ptqa_resp = requests.post(
+                    DEFAULT_PTQA_URL,
+                    json=healing_result_payload,
+                    timeout=(5, PTQA_READ_TIMEOUT_SECONDS),
+                )
+                if ptqa_resp.ok:
+                    failure['ptqa_result'] = ptqa_resp.json()
+                    failure['ptqa_error'] = None
+                else:
+                    failure['ptqa_error'] = f"HTTP {ptqa_resp.status_code}: {ptqa_resp.text[:300]}"
+            except Exception as ptqa_exc:
+                failure['ptqa_error'] = str(ptqa_exc)
+
+        bid = failure.get('botId')
+        if bid and bid in bots:
+            b = bots[bid]
+            if b.get('last_error') and b['last_error'].get('timestamp') == failure.get('timestamp'):
+                b['last_error']['locator_report'] = failure.get('locator_report')
+                if failure.get('locator_report_id'):
+                    b['last_error']['locator_report_id'] = failure.get('locator_report_id')
+                if 'healing_request' in failure:
+                    b['last_error']['healing_request'] = failure.get('healing_request')
+                if 'healing_result' in failure:
+                    b['last_error']['healing_result'] = failure.get('healing_result')
+                if failure.get('healing_status'):
+                    b['last_error']['healing_status'] = failure.get('healing_status')
+                if failure.get('healed_locator'):
+                    b['last_error']['healed_locator'] = failure.get('healed_locator')
+                if failure.get('healing_error'):
+                    b['last_error']['healing_error'] = failure.get('healing_error')
+                if 'ptqa_result' in failure:
+                    b['last_error']['ptqa_result'] = failure.get('ptqa_result')
+                if failure.get('ptqa_error'):
+                    b['last_error']['ptqa_error'] = failure.get('ptqa_error')
+                bots[bid] = b
+    except Exception as e:
+        failure['locator_error'] = str(e)
+
+
+def _build_direct_healing_payload(failure):
+    metadata = failure.get('metadata') or {}
+    ts = time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime())
+    bot_id = failure.get('botId') or metadata.get('bot_id') or 'UNKNOWN_BOT'
+    run_id = metadata.get('run_id', '')
+
+    return {
+        'metadata': {
+            'schema_version': '1.0',
+            'report_id': f"DIRECT-{int(failure.get('timestamp') or time.time())}",
+            'run_id': run_id,
+            'bot_id': bot_id,
+            'timestamp': ts,
+            'source_component': 'distributed_self_healing_orchestrator',
+            'target_component': 'code_healing_engine',
+            'environment': metadata.get('environment', ''),
+        },
+        'failure_context': {
+            'script_path': metadata.get('script_path') or 'data/scripts/broken/auto_generated.py',
+            'failing_line': int(metadata.get('failing_line') or 1),
+            'action': failure.get('last_action') or 'authenticate_user',
+            'old_locator': failure.get('old_locator') or '',
+            'error_type': failure.get('failure_type') or failure.get('category') or 'AUTHENTICATION_ERROR',
+            'error_message': failure.get('error') or 'Authentication failed',
+        },
+        'dom_context': {
+            'new_element_html': failure.get('page_html') or failure.get('dom') or '',
+            'page_url': failure.get('page_url') or metadata.get('target_url') or '',
+            'page_name': metadata.get('page_name') or '',
+        },
+        'element_expectation': {
+            'expected_role': failure.get('element_role') or 'login_form',
+            'expected_text': failure.get('expected_text') or 'Login',
+        },
+        'element_candidate': None,
+    }
+
+
+def _request_direct_healing(failure):
+    payload = _build_direct_healing_payload(failure)
+    try:
+        resp = requests.post(
+            DEFAULT_HEALING_ENGINE_URL,
+            json=payload,
+            timeout=(5, HEALING_READ_TIMEOUT_SECONDS),
+        )
+        if not resp.ok:
+            failure['healing_error'] = f"HTTP {resp.status_code}: {resp.text[:300]}"
+            return
+
+        healing_result = resp.json()
+        failure['healing_request'] = payload
+        failure['healing_result'] = healing_result
+        failure['healing_error'] = None
+
+        hs = (healing_result or {}).get('healing_summary') or {}
+        if hs.get('status'):
+            failure['healing_status'] = hs.get('status')
+        if hs.get('new_locator'):
+            failure['healed_locator'] = hs.get('new_locator')
+
+        try:
+            ptqa_resp = requests.post(
+                DEFAULT_PTQA_URL,
+                json=healing_result,
+                timeout=(5, PTQA_READ_TIMEOUT_SECONDS),
+            )
+            if ptqa_resp.ok:
+                failure['ptqa_result'] = ptqa_resp.json()
+                failure['ptqa_error'] = None
+            else:
+                failure['ptqa_error'] = f"HTTP {ptqa_resp.status_code}: {ptqa_resp.text[:300]}"
+        except Exception as ptqa_exc:
+            failure['ptqa_error'] = str(ptqa_exc)
+
+        bid = failure.get('botId')
+        if bid and bid in bots:
+            b = bots[bid]
+            if b.get('last_error') and b['last_error'].get('timestamp') == failure.get('timestamp'):
+                b['last_error']['healing_request'] = failure.get('healing_request')
+                b['last_error']['healing_result'] = failure.get('healing_result')
+                b['last_error']['healing_error'] = failure.get('healing_error')
+                if failure.get('healing_status'):
+                    b['last_error']['healing_status'] = failure.get('healing_status')
+                if failure.get('healed_locator'):
+                    b['last_error']['healed_locator'] = failure.get('healed_locator')
+                if 'ptqa_result' in failure:
+                    b['last_error']['ptqa_result'] = failure.get('ptqa_result')
+                if failure.get('ptqa_error'):
+                    b['last_error']['ptqa_error'] = failure.get('ptqa_error')
+                bots[bid] = b
+    except Exception as e:
+        failure['healing_error'] = str(e)
+
+
+def _queue_direct_healing_request(failure):
+    if failure.get('_healing_requested'):
+        return
+    failure['_healing_requested'] = True
+    threading.Thread(target=_request_direct_healing, args=(failure,), daemon=True).start()
+
+
+def _queue_locator_request(failure):
+    if failure.get('_locator_requested'):
+        return
+    failure['_locator_requested'] = True
+    threading.Thread(target=_request_locator_report, args=(failure,), daemon=True).start()
 
 
 def process_heartbeat(data):
@@ -96,6 +387,14 @@ def process_failure(data):
             failure['category'] = 'pending'
         except Exception:
             failure['category'] = 'unknown'
+
+    if _should_send_to_locator(failure):
+        _queue_locator_request(failure)
+
+    # Direct healing path for auth failures (locator is intentionally skipped).
+    category = _normalize_locator_category(failure.get('failure_type') or failure.get('category'))
+    if category == 'AUTHENTICATION_ERROR':
+        _queue_direct_healing_request(failure)
 
     return {'status': 'recorded'}
 
@@ -187,14 +486,19 @@ def _classify_failure(model_url, failure):
         if confidence is not None:
             failure['confidence'] = confidence
 
-        # Only fallback if model returned nothing/unknown (do NOT override on low confidence)
+        # Only fallback if model returned nothing (do NOT override explicit UNKNOWN).
         try:
-            if not cat or cat == 'unknown':
+            if not cat:
                 if original_ft:
                     failure['category'] = original_ft
                     failure['failure_type'] = original_ft
         except Exception:
             pass
+
+        _restart_bot_for_category(failure)
+
+        if _should_send_to_locator(failure):
+            _queue_locator_request(failure)
 
         # if the bots dict holds last_error, update it too
         bid = failure.get('botId')
@@ -206,6 +510,10 @@ def _classify_failure(model_url, failure):
                     b['last_error']['failure_type'] = failure.get('failure_type')
                 if failure.get('confidence') is not None:
                     b['last_error']['confidence'] = failure.get('confidence')
+                if failure.get('bot_restart'):
+                    b['last_error']['bot_restart'] = failure.get('bot_restart')
+                if failure.get('bot_restart_error'):
+                    b['last_error']['bot_restart_error'] = failure.get('bot_restart_error')
                 bots[bid] = b
     except Exception:
         pass

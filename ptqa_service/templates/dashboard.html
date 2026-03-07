@@ -174,6 +174,7 @@
                 <th>Confidence</th>
                 <th></th>
                 <th></th>
+                <th></th>
               </tr>
             </thead>
             <tbody>
@@ -185,6 +186,14 @@
                 <td>{{ r.risk_level }}</td>
                 <td class="font-semibold">{{ r.recommendation }}</td>
                 <td>{{ "%.3f"|format(r.confidence or 0) }}</td>
+                <td class="text-right">
+                  <button
+                    class="underline"
+                    onclick='loadRunPayload({{ r.raw_payload|tojson }})'
+                  >
+                    Load Payload
+                  </button>
+                </td>
                 <td class="text-right">
                   <a
                     class="underline"
@@ -288,6 +297,26 @@
         },
       };
 
+      function loadRunPayload(rawPayload) {
+        if (!rawPayload) return;
+
+        try {
+          // DB stores JSON as a string, but we also handle already-parsed objects.
+          const payloadObject =
+            typeof rawPayload === "string"
+              ? JSON.parse(rawPayload)
+              : rawPayload;
+          document.getElementById("payload").value = JSON.stringify(
+            payloadObject,
+            null,
+            2,
+          );
+        } catch (e) {
+          // Fallback keeps the full body visible even if parsing fails.
+          document.getElementById("payload").value = String(rawPayload);
+        }
+      }
+
       function loadPreset(key) {
         document.getElementById("payload").value = JSON.stringify(
           presets[key],
@@ -296,7 +325,78 @@
         );
       }
 
+      const initialLatestRowId =
+        {% if runs and runs|length > 0 %}{{ runs[0].id }}{% else %}null{% endif %};
+      let knownLatestRowId = initialLatestRowId;
+
+      async function pollForNewEvaluations() {
+        try {
+          const res = await fetch("/dashboard/latest", { cache: "no-store" });
+          if (!res.ok) return;
+          const latest = await res.json();
+          const latestRowId = latest.latest_row_id;
+
+          // When a newer row appears in DB, refresh history and rehydrate result panel.
+          if (latestRowId !== null && knownLatestRowId !== latestRowId) {
+            knownLatestRowId = latestRowId;
+            location.reload();
+          }
+        } catch (e) {
+          // Keep polling even if a transient request fails.
+        }
+      }
+
+      function renderDecisionResult(data) {
+        if (!data || typeof data !== "object") return;
+
+        document.getElementById("raw").innerText = JSON.stringify(
+          data,
+          null,
+          2,
+        );
+
+        document.getElementById("recommendation").innerText =
+          data.recommendation || "-";
+        document.getElementById("riskLevel").innerText = data.risk_level || "-";
+        document.getElementById("willWork").innerText =
+          data.will_work_probability ?? "-";
+
+        const m = data.quality_metrics || {};
+        const prB = m.pass_rate_before ?? "-";
+        const prA = m.pass_rate_after ?? "-";
+        const tB = m.avg_time_before ?? "-";
+        const tA = m.avg_time_after ?? "-";
+
+        document.getElementById("passRate").innerText = `${prB} → ${prA}`;
+        document.getElementById("avgTime").innerText = `${tB} → ${tA}`;
+        document.getElementById("passDelta").innerText =
+          m.pass_rate_delta ?? "-";
+        document.getElementById("latDelta").innerText = m.latency_delta ?? "-";
+      }
+
+      async function hydrateLatestDecision() {
+        try {
+          const res = await fetch("/ptqa/evaluate-healing/latest", {
+            cache: "no-store",
+          });
+          if (!res.ok) return;
+
+          const latest = await res.json();
+          if (!latest.available || !latest.decision) return;
+
+          renderDecisionResult(latest.decision);
+        } catch (e) {
+          // Ignore transient errors; polling keeps trying.
+        }
+      }
+
       loadPreset("login");
+
+      {% if runs and runs|length > 0 %}
+      loadRunPayload({{ runs[0].raw_payload|tojson }});
+      {% endif %}
+
+      hydrateLatestDecision();
 
       async function evaluateHealing() {
         const err = document.getElementById("errorBox");
@@ -333,29 +433,12 @@
           return;
         }
 
-        document.getElementById("raw").innerText = JSON.stringify(
-          data,
-          null,
-          2,
-        );
+        renderDecisionResult(data);
 
-        document.getElementById("recommendation").innerText =
-          data.recommendation || "-";
-        document.getElementById("riskLevel").innerText = data.risk_level || "-";
-        document.getElementById("willWork").innerText =
-          data.will_work_probability ?? "-";
-
-        const m = data.quality_metrics || {};
-        const prB = m.pass_rate_before ?? "-";
-        const prA = m.pass_rate_after ?? "-";
-        const tB = m.avg_time_before ?? "-";
-        const tA = m.avg_time_after ?? "-";
-
-        document.getElementById("passRate").innerText = `${prB} → ${prA}`;
-        document.getElementById("avgTime").innerText = `${tB} → ${tA}`;
-        document.getElementById("passDelta").innerText =
-          m.pass_rate_delta ?? "-";
-        document.getElementById("latDelta").innerText = m.latency_delta ?? "-";
+        // Auto-refresh so new evaluation appears in history without manual action.
+        setTimeout(() => {
+          location.reload();
+        }, 800);
       }
 
       async function deleteRun(healingId) {
@@ -389,6 +472,9 @@
         }
         location.reload();
       }
+
+      // Auto-refresh dashboard when another service posts a new evaluation.
+      setInterval(pollForNewEvaluations, 3000);
     </script>
   </body>
 </html>

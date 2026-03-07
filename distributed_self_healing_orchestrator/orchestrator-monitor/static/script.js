@@ -41,6 +41,12 @@ function renderFailures(failures){
     if(f.last_action || f.failed_action) meta.push(`<strong>Action:</strong> ${escapeHtml(f.failed_action || f.last_action)}`);
     if(f.strategy) meta.push(`<strong>Strategy:</strong> ${escapeHtml(f.strategy)}`);
     if(f.priority) meta.push(`<strong>Priority:</strong> ${escapeHtml(f.priority)}`);
+    if(f.locator_report_id) meta.push(`<strong>Locator Report:</strong> ${escapeHtml(f.locator_report_id)}`);
+    if(f.locator_report && f.locator_report.element_candidate){
+      const c = f.locator_report.element_candidate;
+      const score = (typeof c.score === 'number') ? c.score.toFixed(3) : 'N/A';
+      meta.push(`<strong>Locator:</strong> ${escapeHtml(c.strategy || 'N/A')} (score ${escapeHtml(score)})`);
+    }
     
     // New comprehensive fields display
     const comprehensiveInfo = [];
@@ -97,59 +103,226 @@ function escapeHtml(str){
     .replace(/'/g, '&#39;');
 }
 
+function formatUnixTime(seconds){
+  if(!seconds) return '-';
+  const d = new Date(seconds * 1000);
+  return Number.isNaN(d.getTime()) ? String(seconds) : d.toLocaleString();
+}
+
+function formatIsoTime(value){
+  if(!value) return '-';
+  const d = new Date(value);
+  return Number.isNaN(d.getTime()) ? String(value) : d.toLocaleString();
+}
+
+function formatPercent(value){
+  if(typeof value !== 'number') return '-';
+  return `${Math.round(value * 100)}%`;
+}
+
+function formatNumber(value, digits = 3){
+  if(typeof value !== 'number') return '-';
+  return value.toFixed(digits);
+}
+
+function sectionCardHtml(title, rows){
+  const visible = rows.filter((row) => row && row.value !== undefined && row.value !== null);
+  if(!visible.length) return '';
+  const items = visible.map((row) => {
+    const label = escapeHtml(row.label || '');
+    const rawValue = row.value === '' ? '-' : String(row.value);
+    const safeValue = escapeHtml(rawValue);
+    const valueHtml = row.code
+      ? `<code style="background:rgba(0,0,0,0.35);padding:3px 8px;border-radius:6px;font-size:12px;display:inline-block;word-break:break-all">${safeValue}</code>`
+      : `<span style="font-weight:600;word-break:break-word">${safeValue}</span>`;
+    return `
+      <div style="display:grid;grid-template-columns:220px 1fr;gap:10px;align-items:start">
+        <div style="color:var(--muted);font-size:12px">${label}</div>
+        <div>${valueHtml}</div>
+      </div>
+    `;
+  }).join('');
+
+  return `
+    <div style="border:1px solid rgba(255,255,255,0.08);border-radius:10px;padding:12px;background:rgba(255,255,255,0.02)">
+      <div style="font-weight:700;margin-bottom:10px">${escapeHtml(title)}</div>
+      <div style="display:grid;gap:8px">${items}</div>
+    </div>
+  `;
+}
+
+function listCardHtml(title, items){
+  if(!Array.isArray(items) || !items.length) return '';
+  const listItems = items.map((item) => `<li style="margin-bottom:6px">${escapeHtml(String(item))}</li>`).join('');
+  return `
+    <div style="border:1px solid rgba(255,255,255,0.08);border-radius:10px;padding:12px;background:rgba(255,255,255,0.02)">
+      <div style="font-weight:700;margin-bottom:10px">${escapeHtml(title)}</div>
+      <ul style="margin:0;padding-left:18px">${listItems}</ul>
+    </div>
+  `;
+}
+
+function parseMaybeJsonObject(value){
+  if(!value) return null;
+  if(typeof value === 'object') return value;
+  if(typeof value !== 'string') return null;
+  const trimmed = value.trim();
+  if(!(trimmed.startsWith('{') || trimmed.startsWith('['))) return null;
+  try{
+    const parsed = JSON.parse(trimmed);
+    return (parsed && typeof parsed === 'object') ? parsed : null;
+  }catch(_err){
+    return null;
+  }
+}
+
+function firstObject(values){
+  for(const value of values){
+    const parsed = parseMaybeJsonObject(value);
+    if(parsed) return parsed;
+  }
+  return {};
+}
+
+function looksLikeLocatorReport(value){
+  const obj = parseMaybeJsonObject(value);
+  if(!obj || typeof obj !== 'object') return false;
+  return !!(obj.failure_context && obj.element_expectation && obj.metadata);
+}
+
 function showFailureJson(failure){
   const modal = document.getElementById('failure-modal');
   const pre = document.getElementById('failure-json-pre');
-  if(!modal || !pre) return;
-  // pretty-print JSON, but sanitize
+  const sectionsEl = document.getElementById('failure-sections');
+  const rawBtn = document.getElementById('failure-toggle-raw');
+  if(!modal || !pre || !sectionsEl) return;
+
+  // pretty-print JSON for debug mode
   try{
     const pretty = JSON.stringify(failure, null, 2);
     pre.textContent = pretty;
   }catch(e){
     pre.textContent = String(failure);
   }
-  // populate structured fields with comprehensive data
-  const fieldsEl = document.getElementById('failure-fields');
-    if(fieldsEl){
-      const parts = [];
-      // Original fields
-      if(failure.failure_type) parts.push(['Type', failure.failure_type]);
-      if(failure.last_action || failure.failed_action) parts.push(['Last action', failure.failed_action || failure.last_action]);
-      if(failure.strategy) parts.push(['Strategy', failure.strategy]);
-      if(failure.priority) parts.push(['Priority', failure.priority]);
-      if(failure.category) parts.push(['Category', failure.category + (failure.confidence ? ` (${Math.round(failure.confidence*100)}%)` : '')]);
-      
-      // Comprehensive new fields
-      if(failure.page_url) parts.push(['Page URL', failure.page_url]);
-      if(failure.element_role) parts.push(['Element Role', failure.element_role]);
-      if(failure.expected_text) parts.push(['Expected Text', failure.expected_text]);
-      if(failure.old_locator) parts.push(['Old Locator', failure.old_locator]);
-      if(failure.old_locator_type) parts.push(['Locator Type', failure.old_locator_type]);
-      if(failure.screenshot_path) parts.push(['Screenshot', failure.screenshot_path]);
-      if(failure.page_html) parts.push(['Page HTML Size', `${(failure.page_html.length / 1024).toFixed(2)} KB`]);
-      
-      // Metadata object fields
-      if(failure.metadata){
-        if(failure.metadata.bot_id) parts.push(['Metadata: Bot ID', failure.metadata.bot_id]);
-        if(failure.metadata.workflow_step) parts.push(['Workflow Step', failure.metadata.workflow_step]);
-        if(failure.metadata.base_url) parts.push(['Base URL', failure.metadata.base_url]);
-        if(failure.metadata.target_url) parts.push(['Target URL', failure.metadata.target_url]);
-        if(failure.metadata.timestamp) parts.push(['Metadata Timestamp', new Date(failure.metadata.timestamp).toLocaleString()]);
-        if(failure.metadata.error_type) parts.push(['Error Type', failure.metadata.error_type]);
-      }
-      
-      parts.push(['Bot ID', failure.botId || '']);
-      parts.push(['Timestamp', failure.timestamp ? new Date(failure.timestamp*1000).toLocaleString() : '']);
-      fieldsEl.innerHTML = parts.map(p => {
-        const key = escapeHtml(p[0]);
-        const val = escapeHtml(String(p[1]||''));
-        const valHtml = (p[0] === 'Category') ? `<span class="category-badge" style="font-size:0.95rem">${val}</span>` : 
-                        (p[0].includes('URL') || p[0] === 'Screenshot') ? `<span style="word-break:break-all;font-size:0.85rem">${val}</span>` :
-                        (p[0].includes('Locator')) ? `<code style="background:rgba(0,0,0,0.3);padding:4px 8px;border-radius:4px;font-size:0.85rem;display:block;margin-top:4px">${val}</code>` :
-                        val;
-        return `<div style="min-width:160px;padding:8px;border-radius:8px;background:rgba(255,255,255,0.02)"><div style="font-size:12px;color:var(--muted)">${key}</div><div style="font-weight:700;margin-top:6px">${valHtml}</div></div>`;
-      }).join('');
-    }
+
+  pre.style.display = 'none';
+  if(rawBtn){
+    rawBtn.textContent = 'Show Raw JSON (Debug)';
+    rawBtn.onclick = () => {
+      const showing = pre.style.display === 'block';
+      pre.style.display = showing ? 'none' : 'block';
+      rawBtn.textContent = showing ? 'Show Raw JSON (Debug)' : 'Hide Raw JSON';
+    };
+  }
+
+  const locatorReport = firstObject([
+    failure.locator_report,
+    failure.locatorReport,
+    failure.element_locator_details,
+    failure.ai_locator_output,
+    looksLikeLocatorReport(failure) ? failure : null,
+  ]);
+
+  const healingRequest = firstObject([
+    failure.healing_request,
+    locatorReport.healing_request,
+    failure.healingRequest,
+    failure.healing_input,
+  ]);
+
+  const healingResult = firstObject([
+    failure.healing_result,
+    locatorReport.healing_result,
+    failure.healingResult,
+  ]);
+
+  const healingSummary = healingResult.healing_summary || {};
+  const ptqaResult = firstObject([
+    failure.ptqa_result,
+    failure.ptqaResult,
+    failure.ptqa_output,
+  ]);
+
+  const categoryLabel = `${failure.category || failure.failure_type || '-'}${typeof failure.confidence === 'number' ? ` (${Math.round(failure.confidence * 100)}%)` : ''}`;
+
+  const errorRows = [
+    { label: 'Bot ID', value: failure.botId || failure.metadata?.bot_id || '-' },
+    { label: 'Timestamp', value: formatUnixTime(failure.timestamp) },
+    { label: 'Category', value: categoryLabel },
+    { label: 'Failure Type', value: failure.failure_type || '-' },
+    { label: 'Error Message', value: failure.error || '-' },
+    { label: 'Last Action', value: failure.failed_action || failure.last_action || '-' },
+    { label: 'Page URL', value: failure.page_url || failure.metadata?.target_url || '-' },
+    { label: 'Element Role', value: failure.element_role || '-' },
+    { label: 'Expected Text', value: failure.expected_text || '-' },
+    { label: 'Old Locator', value: failure.old_locator || '-', code: true },
+    { label: 'Locator Type', value: failure.old_locator_type || '-' },
+    { label: 'Screenshot', value: failure.screenshot_path || '-' },
+    { label: 'Page HTML Size', value: failure.page_html ? `${(failure.page_html.length / 1024).toFixed(2)} KB` : '-' },
+    { label: 'Workflow Step', value: failure.metadata?.workflow_step || '-' },
+    { label: 'Metadata Timestamp', value: formatIsoTime(failure.metadata?.timestamp) },
+    { label: 'Error Type', value: failure.metadata?.error_type || '-' },
+  ];
+
+  const locatorRows = [
+    { label: 'Report ID', value: locatorReport.metadata?.report_id || failure.locator_report_id || '-' },
+    { label: 'Run ID', value: locatorReport.metadata?.run_id || '-' },
+    { label: 'Source Component', value: locatorReport.metadata?.source_component || '-' },
+    { label: 'Timestamp', value: formatIsoTime(locatorReport.metadata?.timestamp) },
+    { label: 'Action', value: locatorReport.failure_context?.action || failure.last_action || '-' },
+    { label: 'Error Type', value: locatorReport.failure_context?.error_type || failure.failure_type || '-' },
+    { label: 'Error Message', value: locatorReport.failure_context?.error_message || failure.error || '-' },
+    { label: 'Old Locator', value: locatorReport.failure_context?.old_locator || failure.old_locator || '-', code: true },
+    { label: 'Expected Role', value: locatorReport.element_expectation?.expected_role || failure.element_role || '-' },
+    { label: 'Expected Text', value: locatorReport.element_expectation?.expected_text || failure.expected_text || '-' },
+    { label: 'Candidate Strategy', value: locatorReport.element_candidate?.strategy || '-' },
+    { label: 'Candidate Score', value: formatNumber(locatorReport.element_candidate?.score) },
+    { label: 'Candidate XPath', value: locatorReport.element_candidate?.xpath || '-', code: !!locatorReport.element_candidate?.xpath },
+    { label: 'Candidate CSS', value: locatorReport.element_candidate?.css || '-', code: !!locatorReport.element_candidate?.css },
+    { label: 'Locator Error', value: failure.locator_error || '-' },
+  ];
+
+  const healingRows = [
+    { label: 'Healing ID', value: healingResult.metadata?.healing_id || '-' },
+    { label: 'Report ID', value: healingResult.metadata?.report_id || locatorReport.metadata?.report_id || '-' },
+    { label: 'Run ID', value: healingResult.metadata?.run_id || locatorReport.metadata?.run_id || '-' },
+    { label: 'Timestamp', value: formatIsoTime(healingResult.metadata?.timestamp) },
+    { label: 'Status', value: healingSummary.status || failure.healing_status || '-' },
+    { label: 'Strategy Used', value: healingSummary.strategy_used || '-' },
+    { label: 'Action', value: healingSummary.action || healingResult.failure_context?.action || '-' },
+    { label: 'Old Locator', value: healingSummary.old_locator || healingResult.failure_context?.old_locator || '-', code: true },
+    { label: 'New Locator', value: healingSummary.new_locator || '-', code: !!healingSummary.new_locator },
+    { label: 'Confidence', value: formatNumber(healingSummary.confidence) },
+    { label: 'Model', value: healingResult.model_info?.model || '-' },
+    { label: 'Model Confidence', value: formatNumber(healingResult.model_info?.confidence) },
+    { label: 'Original Script Path', value: healingResult.script_output?.original_script_path || healingRequest.failure_context?.script_path || '-' },
+    { label: 'Healed Script Path', value: healingResult.script_output?.healed_script_path || '-' },
+    { label: 'Validation Result', value: healingSummary.validation?.valid === true ? 'Valid' : (healingSummary.validation?.valid === false ? 'Invalid' : '-') },
+    { label: 'Validation Reason', value: healingSummary.validation?.reason || '-' },
+    { label: 'Healing Error', value: failure.healing_error || locatorReport.healing_error || '-' },
+  ];
+
+  const ptqaRows = [
+    { label: 'Recommendation', value: ptqaResult.recommendation || '-' },
+    { label: 'Risk Level', value: ptqaResult.risk_level || '-' },
+    { label: 'Confidence', value: formatPercent(ptqaResult.confidence) },
+    { label: 'Will Work Probability', value: formatPercent(ptqaResult.will_work_probability) },
+    { label: 'Model Name', value: ptqaResult.model_name || '-' },
+    { label: 'Pass Rate (Before -> After)', value: (typeof ptqaResult.quality_metrics?.pass_rate_before === 'number' && typeof ptqaResult.quality_metrics?.pass_rate_after === 'number') ? `${Math.round(ptqaResult.quality_metrics.pass_rate_before * 100)}% -> ${Math.round(ptqaResult.quality_metrics.pass_rate_after * 100)}%` : '-' },
+    { label: 'Pass Rate Delta', value: formatPercent(ptqaResult.quality_metrics?.pass_rate_delta) },
+    { label: 'Latency Delta', value: typeof ptqaResult.quality_metrics?.latency_delta === 'number' ? `${ptqaResult.quality_metrics.latency_delta.toFixed(3)}s` : '-' },
+    { label: 'Healing Effect', value: ptqaResult.quality_metrics?.healing_effect || '-' },
+    { label: 'Has Regression', value: typeof ptqaResult.quality_metrics?.has_regression === 'boolean' ? (ptqaResult.quality_metrics.has_regression ? 'Yes' : 'No') : '-' },
+  ];
+
+  sectionsEl.innerHTML = [
+    sectionCardHtml('Failure Details', errorRows),
+    sectionCardHtml('Element Locator Details', locatorRows),
+    sectionCardHtml('Healing Details', healingRows),
+    sectionCardHtml('PTQA Service Details', ptqaRows),
+    listCardHtml('PTQA Reasons', ptqaResult.reasons),
+    listCardHtml('PTQA Validation Steps', ptqaResult.validation_steps),
+  ].join('');
 
   // prepare DOM render button (for page_html if available, fallback to dom)
   const domContainer = document.getElementById('failure-dom-container');

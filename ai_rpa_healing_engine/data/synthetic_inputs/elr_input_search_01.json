@@ -9,7 +9,7 @@
   },
   "failure_context": {
     "script_path": "data/scripts/broken/search_flow.py",
-    "failing_line": 11,
+    "failing_line": 13,
     "action": "fill",
     "old_locator": "textarea[name='qqq']",
     "error_type": "ELEMENT_NOT_FOUND",

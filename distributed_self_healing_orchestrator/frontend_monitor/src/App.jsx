@@ -2,7 +2,11 @@ import { useState, useEffect, useRef } from 'react'
 import Header from './components/Header'
 import BotsTable from './components/BotsTable'
 import ChartsPanel from './components/ChartsPanel'
-import { fetchBotStatus } from './services/api'
+import {
+  fetchBotStatus,
+  sendToElementLocatorEngine,
+  sendToHealingEngineDirect,
+} from './services/api'
 
 const ERROR_TYPE_BY_ID = {
   '0': 'UI_SELECTOR_CHANGED',
@@ -14,6 +18,14 @@ const ERROR_TYPE_BY_ID = {
   '6': 'ENV_CONFIG_ERROR',
   '7': 'AUTHENTICATION_ERROR',
   '8': 'UNKNOWN',
+}
+
+const ERROR_TYPE_ALIASES = {
+  ELEMENTNOTFOUND: 'ELEMENT_NOT_VISIBLE',
+  ELEMENT_NOT_FOUND: 'ELEMENT_NOT_VISIBLE',
+  NO_SUCH_ELEMENT: 'ELEMENT_NOT_VISIBLE',
+  ELEMENTNOTINTERACTABLE: 'ELEMENT_NOT_VISIBLE',
+  STALEELEMENTREFERENCE: 'UI_SELECTOR_CHANGED',
 }
 
 const SOUND_PROFILES = {
@@ -73,6 +85,17 @@ const SOUND_PROFILES = {
   },
 }
 
+const HEALING_TRIGGER_TYPES = new Set([
+  'UI_SELECTOR_CHANGED',
+  'ELEMENT_NOT_VISIBLE',
+  'APPLICATION_UPDATE',
+  'BOT_LOGIC_ERROR',
+  'ENV_CONFIG_ERROR',
+  'AUTHENTICATION_ERROR',
+])
+
+const DIRECT_HEALING_TYPES = new Set(['AUTHENTICATION_ERROR'])
+
 function App() {
   const [bots, setBots] = useState({})
   const [failures, setFailures] = useState([])
@@ -85,6 +108,8 @@ function App() {
   const audioUnlockedRef = useRef(false)
   const audioHintShownRef = useRef(false)
   const pendingAlertsRef = useRef([])
+  const locatorSentRef = useRef({})
+  const locatorReportByFailureKeyRef = useRef({})
   const loadStatusRef = useRef(null)
   const unlockAudioRef = useRef(null)
 
@@ -103,6 +128,9 @@ function App() {
     }
 
     const normalized = rawStr.toUpperCase().replace(/\s+/g, '_')
+    if (ERROR_TYPE_ALIASES[normalized]) {
+      return ERROR_TYPE_ALIASES[normalized]
+    }
     if (SOUND_PROFILES[normalized]) {
       return normalized
     }
@@ -217,6 +245,21 @@ function App() {
 
   const getFailureKey = (failure) => `${failure.botId || 'unknown'}:${failure.timestamp || 0}`
 
+  const attachLocatorReport = (failure) => {
+    const key = getFailureKey(failure)
+    const locatorReport = locatorReportByFailureKeyRef.current[key]
+    if (!locatorReport) return failure
+
+    return {
+      ...failure,
+      locator_report: locatorReport,
+      metadata: {
+        ...(failure.metadata || {}),
+        locator_report_id: locatorReport?.metadata?.report_id || null,
+      },
+    }
+  }
+
   const shouldPlayForFailure = (failure, previousCategory) => {
     const category = resolveErrorType(failure)
     if (!category) return false
@@ -240,6 +283,66 @@ function App() {
         showSnackbar(`Failure detected · ${label}: ${message}`, profile.variant)
       }
 
+      const shouldSendToLocator = HEALING_TRIGGER_TYPES.has(currentCategory)
+      const shouldDirectToHealing = DIRECT_HEALING_TYPES.has(currentCategory)
+      const route = shouldDirectToHealing ? 'direct-healing' : 'locator'
+      const sendKey = `${key}:${currentCategory}:${route}`
+      if (shouldSendToLocator && !locatorSentRef.current[sendKey]) {
+        locatorSentRef.current[sendKey] = true
+        const sender = shouldDirectToHealing
+          ? sendToHealingEngineDirect(failure)
+          : sendToElementLocatorEngine(failure)
+
+        sender
+          .then((locatorReport) => {
+            const locatorReportForState = shouldDirectToHealing
+              ? {
+                  metadata: {
+                    report_id: `DIRECT-${Date.now()}`,
+                    run_id: failure?.metadata?.run_id || '',
+                    timestamp: new Date().toISOString(),
+                    source_component: 'frontend_monitor',
+                    target_component: 'code_healing_engine',
+                  },
+                  healing_result: locatorReport,
+                  healing_error: null,
+                }
+              : locatorReport
+
+            locatorReportByFailureKeyRef.current[key] = locatorReportForState
+            setFailures((prev) =>
+              prev.map((item) => {
+                const itemKey = getFailureKey(item)
+                if (itemKey !== key) return item
+                return {
+                  ...item,
+                  locator_report: locatorReportForState,
+                  healing_result: shouldDirectToHealing ? locatorReport : item.healing_result,
+                  healing_error: null,
+                  metadata: {
+                    ...(item.metadata || {}),
+                    locator_report_id: locatorReportForState?.metadata?.report_id || null,
+                  },
+                }
+              })
+            )
+            showSnackbar(
+              shouldDirectToHealing
+                ? 'Authentication error sent directly to healing engine'
+                : 'AI locator report received',
+              'generic'
+            )
+          })
+          .catch((err) => {
+            console.error(
+              shouldDirectToHealing
+                ? 'Error sending failure directly to healing engine:'
+                : 'Error sending failure to element locator engine:',
+              err
+            )
+          })
+      }
+
       playedRef.current[key] = currentCategory
       seenRef.current[key] = true
     })
@@ -249,11 +352,12 @@ function App() {
     try {
       const data = await fetchBotStatus()
       const nextFailures = (data.failures || []).map((failure) => {
+        const enrichedFailure = attachLocatorReport(failure)
         const profile = getSoundProfile(failure)
         return {
-          ...failure,
+          ...enrichedFailure,
           metadata: {
-            ...(failure.metadata || {}),
+            ...(enrichedFailure.metadata || {}),
             sound: profile.label,
           },
         }

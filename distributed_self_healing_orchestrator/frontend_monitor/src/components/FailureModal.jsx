@@ -4,6 +4,13 @@ import { escapeHtml } from '../utils/helpers'
 function FailureModal({ failure, onClose }) {
   const [showDom, setShowDom] = useState(false)
   const soundLabel = (failure?.metadata && failure.metadata.sound) || 'Alert tone'
+  const locatorReport = failure?.locator_report
+  const healingResult = failure?.healing_result || locatorReport?.healing_result
+  const healingRequest = failure?.healing_request || locatorReport?.healing_request
+  const healingError = failure?.healing_error || locatorReport?.healing_error
+  const healingSummary = healingResult?.healing_summary
+  const ptqaResult = failure?.ptqa_result
+  const ptqaError = failure?.ptqa_error
 
   const handleOverlayClick = (e) => {
     if (e.target.id === 'failure-overlay') {
@@ -48,6 +55,39 @@ function FailureModal({ failure, onClose }) {
         parts.push(['Metadata Timestamp', new Date(failure.metadata.timestamp).toLocaleString()])
       if (failure.metadata.error_type) parts.push(['Error Type', failure.metadata.error_type])
     }
+
+    if (locatorReport?.metadata?.report_id)
+      parts.push(['Locator Report ID', locatorReport.metadata.report_id])
+    if (locatorReport?.metadata?.run_id) parts.push(['Locator Run ID', locatorReport.metadata.run_id])
+    if (locatorReport?.element_candidate?.strategy)
+      parts.push(['Locator Strategy', locatorReport.element_candidate.strategy])
+    if (typeof locatorReport?.element_candidate?.score === 'number')
+      parts.push(['Locator Score', locatorReport.element_candidate.score.toFixed(3)])
+    if (locatorReport?.element_candidate?.xpath)
+      parts.push(['Locator XPath', locatorReport.element_candidate.xpath])
+    if (locatorReport?.element_candidate?.css)
+      parts.push(['Locator CSS', locatorReport.element_candidate.css])
+
+    if (healingSummary?.status) parts.push(['Healing Status', healingSummary.status])
+    if (healingSummary?.strategy_used)
+      parts.push(['Healing Strategy', healingSummary.strategy_used])
+    if (healingSummary?.new_locator)
+      parts.push(['Healed Locator', healingSummary.new_locator])
+    if (healingSummary?.validation?.reason)
+      parts.push(['Healing Reason', healingSummary.validation.reason])
+    if (healingError) parts.push(['Healing Error', healingError])
+
+    if (ptqaResult?.recommendation)
+      parts.push(['PTQA Recommendation', ptqaResult.recommendation])
+    if (ptqaResult?.risk_level) parts.push(['PTQA Risk', ptqaResult.risk_level])
+    if (typeof ptqaResult?.confidence === 'number')
+      parts.push(['PTQA Confidence', `${Math.round(ptqaResult.confidence * 100)}%`])
+    if (typeof ptqaResult?.will_work_probability === 'number')
+      parts.push([
+        'PTQA Will Work',
+        `${Math.round(ptqaResult.will_work_probability * 100)}%`,
+      ])
+    if (ptqaError) parts.push(['PTQA Error', ptqaError])
 
     parts.push(['Bot ID', failure.botId || ''])
     parts.push([
@@ -192,6 +232,94 @@ function FailureModal({ failure, onClose }) {
                 style={{ width: '100%', height: '500px', border: 0 }}
               />
             </div>
+          )}
+
+          {locatorReport && (
+            <>
+              <div style={{ marginTop: '12px' }}>
+                <strong>AI Locator Output</strong>
+              </div>
+              <pre
+                style={{
+                  marginTop: '8px',
+                  background: 'rgba(0,0,0,0.06)',
+                  padding: '12px',
+                  borderRadius: '6px',
+                  maxHeight: '360px',
+                  overflow: 'auto',
+                  color: '#e6eef8',
+                  fontSize: '13px',
+                }}
+              >
+                {JSON.stringify(locatorReport, null, 2)}
+              </pre>
+            </>
+          )}
+
+          {healingResult && (
+            <>
+              <div style={{ marginTop: '12px' }}>
+                <strong>AI Healing Output</strong>
+              </div>
+              <pre
+                style={{
+                  marginTop: '8px',
+                  background: 'rgba(0,0,0,0.06)',
+                  padding: '12px',
+                  borderRadius: '6px',
+                  maxHeight: '360px',
+                  overflow: 'auto',
+                  color: '#e6eef8',
+                  fontSize: '13px',
+                }}
+              >
+                {JSON.stringify(healingResult, null, 2)}
+              </pre>
+            </>
+          )}
+
+          {healingRequest && (
+            <>
+              <div style={{ marginTop: '12px' }}>
+                <strong>Healing Request Body</strong>
+              </div>
+              <pre
+                style={{
+                  marginTop: '8px',
+                  background: 'rgba(0,0,0,0.06)',
+                  padding: '12px',
+                  borderRadius: '6px',
+                  maxHeight: '360px',
+                  overflow: 'auto',
+                  color: '#e6eef8',
+                  fontSize: '13px',
+                }}
+              >
+                {JSON.stringify(healingRequest, null, 2)}
+              </pre>
+            </>
+          )}
+
+          {ptqaResult && (
+            <>
+              <div style={{ marginTop: '12px' }}>
+                <strong>PTQA Output</strong>
+              </div>
+              <pre
+                style={{
+                  marginTop: '8px',
+                  background: 'rgba(0,0,0,0.06)',
+                  padding: '12px',
+                  borderRadius: '6px',
+                  maxHeight: '360px',
+                  overflow: 'auto',
+                  color: '#e6eef8',
+                  fontSize: '13px',
+                }}
+              >
+                {JSON.stringify(ptqaResult, null, 2)}
+              </pre>
+            </>
           )}
 
           <div style={{ marginTop: '12px' }}>
