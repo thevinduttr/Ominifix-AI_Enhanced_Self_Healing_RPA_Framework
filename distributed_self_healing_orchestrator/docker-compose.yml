@@ -120,6 +120,20 @@ services:
     depends_on:
       - orchestrator_monitor
 
+  bot23:
+    build:
+      context: .
+      dockerfile: dummy_bot/Dockerfile
+    container_name: ominifix_bot23
+    command: ["python", "bot23.py"]
+    environment:
+      - MONITOR_URL=http://orchestrator_monitor:8000/heartbeat
+      - BOT_ID=RPA-0023
+      - HEARTBEATS=5
+      - INTERVAL=4
+    depends_on:
+      - orchestrator_monitor
+
   bot_logic_error:
     build:
       context: .

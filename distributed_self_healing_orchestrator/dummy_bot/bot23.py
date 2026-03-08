@@ -25,20 +25,21 @@ while True:
 
     failure_payload = {
         "botId": BOT_ID,
-        "page_url": "https://dummy.local/details",
-        "failure_type": "ElementNotFound",
-        "failed_action": "click",
-        "element_role": "primary_action",
-        "expected_text": "View details",
-        "old_locator": "//button[@id='view_details']",
-        "old_locator_type": "xpath",
-        "error_message": "No node found for selector",
-        "page_html": "<!doctype html><html><body><div class=\"card\"><a id=\"view_details_link\" class=\"btn primary\">View details</a></div></body></html>",
+        "page_url": "https://dummy.local/api/payments",
+        "failure_type": "NETWORK_ERROR",
+        "failed_action": "request",
+        "element_role": "api_call",
+        "expected_text": "HTTP 200",
+        "old_locator": "https://dummy.local/api/payments",
+        "old_locator_type": "url",
+        "error_message": "Connection timed out while calling upstream service",
+        "page_html": "",
         "screenshot_path": "",
         "metadata": {
             "bot_id": "RPA-0020",
-            "workflow_step": "open_details",
-            "run_id": "RUN-PP1-BUTTON-TO-A"
+            "workflow_step": "submit_payment",
+            "run_id": "RUN-PP1-NETWORK-TIMEOUT",
+            "error_type": "NETWORK_ERROR"
         }
     }
 

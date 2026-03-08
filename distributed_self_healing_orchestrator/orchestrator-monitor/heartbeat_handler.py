@@ -16,6 +16,14 @@ DEFAULT_PTQA_URL = os.environ.get('PTQA_SERVICE_URL', 'http://ptqa_service:8000/
 PTQA_READ_TIMEOUT_SECONDS = float(os.environ.get("PTQA_READ_TIMEOUT_SECONDS", "30"))
 PTQA_RESTART_DELAY_SECONDS = float(os.environ.get("PTQA_RESTART_DELAY_SECONDS", "3"))
 RESTART_ONLY_ON_PTQA_APPROVAL = os.environ.get("RESTART_ONLY_ON_PTQA_APPROVAL", "true").strip().lower() in {"1", "true", "yes"}
+NETWORK_ERROR_RESTART_MIN_CONFIDENCE_PERCENT = float(
+    os.environ.get("NETWORK_ERROR_RESTART_MIN_CONFIDENCE_PERCENT", "51")
+)
+NETWORK_ERROR_AUTO_RESTART = os.environ.get(
+    "NETWORK_ERROR_AUTO_RESTART",
+    "true",
+).strip().lower() in {"1", "true", "yes"}
+FAILED_STATUS_HOLD_SECONDS = float(os.environ.get("FAILED_STATUS_HOLD_SECONDS", "12"))
 RESTART_ON_CATEGORIES = {
     c.strip().upper()
     for c in os.environ.get(
@@ -55,6 +63,38 @@ def _parse_bot_service_map(raw_value):
 BOT_SERVICE_MAP = _parse_bot_service_map(os.environ.get("BOT_SERVICE_MAP", ""))
 
 
+def _confidence_to_percent(value):
+    """Normalize confidence values in [0..1] or [0..100] into percent."""
+    try:
+        n = float(value)
+    except Exception:
+        return None
+
+    if n < 0:
+        return None
+    if n <= 1:
+        return n * 100.0
+    return n
+
+
+def _should_restart_network_error_by_confidence(failure):
+    category = (failure.get('category') or '').strip().upper()
+    if category != 'NETWORK_ERROR':
+        return False
+
+    confidence_percent = _confidence_to_percent(failure.get('confidence'))
+    if confidence_percent is None:
+        return False
+
+    return confidence_percent >= NETWORK_ERROR_RESTART_MIN_CONFIDENCE_PERCENT
+
+
+def _is_network_error_failure(failure):
+    category = _normalize_locator_category(failure.get('category'))
+    failure_type = _normalize_locator_category(failure.get('failure_type'))
+    return category == 'NETWORK_ERROR' or failure_type == 'NETWORK_ERROR'
+
+
 def _extract_ptqa_recommendation(data):
     """Read recommendation from common payload shapes used by monitor/PTQA integration."""
     if not isinstance(data, dict):
@@ -79,10 +119,15 @@ def _get_docker_client():
 
 
 def _restart_bot_for_category(failure):
-    if RESTART_ONLY_ON_PTQA_APPROVAL:
+    is_network_error = _is_network_error_failure(failure)
+    allow_network_restart = is_network_error and (
+        NETWORK_ERROR_AUTO_RESTART or _should_restart_network_error_by_confidence(failure)
+    )
+
+    if RESTART_ONLY_ON_PTQA_APPROVAL and not allow_network_restart:
         return
 
-    category = (failure.get('category') or '').strip().upper()
+    category = _normalize_locator_category(failure.get('category') or failure.get('failure_type'))
     if category not in RESTART_ON_CATEGORIES:
         return
 
@@ -92,22 +137,19 @@ def _restart_bot_for_category(failure):
         return
 
     try:
-        client = _get_docker_client()
-        containers = client.containers.list(
-            all=True,
-            filters={"label": f"com.docker.compose.service={bot_id}"},
-        )
-        if not containers:
-            failure['bot_restart_error'] = f"no compose service container found for '{bot_id}'"
+        metadata = failure.get('metadata') or {}
+        service_hint = metadata.get('bot_service') or metadata.get('compose_service')
+        container = _find_container_for_bot(bot_id, service_hint=service_hint)
+        if container is None:
+            failure['bot_restart_error'] = f"no container found for botId '{bot_id}'"
             return
 
-        # Restart first matched compose service container.
-        container = containers[0]
         container.restart(timeout=10)
+        service_name = (container.labels or {}).get('com.docker.compose.service') or container.name
         failure['bot_restart'] = {
             'requested': True,
             'category': category,
-            'service': bot_id,
+            'service': service_name,
             'container': container.name,
             'timestamp': time.time(),
             'status': 'restarted',
@@ -467,6 +509,20 @@ def process_heartbeat(data):
     # Update last seen and mark running
     now = time.time()
     info = bots.get(bot_id, {})
+
+    # Keep FAILED visible briefly so fast auto-restarts don't hide it in UI.
+    failed_at = info.get("failed_at")
+    if info.get("status") == "FAILED" and failed_at is not None:
+        elapsed = now - float(failed_at)
+        if elapsed < max(0.0, FAILED_STATUS_HOLD_SECONDS):
+            info["last_seen"] = now
+            bots[bot_id] = info
+            return {
+                "status": "received",
+                "state": "FAILED_HOLD",
+                "hold_seconds_remaining": round(max(0.0, FAILED_STATUS_HOLD_SECONDS - elapsed), 2),
+            }
+
     info.update({
         "last_seen": now,
         "status": "RUNNING"
