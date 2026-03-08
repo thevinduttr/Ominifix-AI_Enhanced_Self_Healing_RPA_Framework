@@ -1,5 +1,6 @@
 import os
 import threading
+import time
 from datetime import datetime
 
 import requests
@@ -9,11 +10,12 @@ from playwright.sync_api import sync_playwright
 APP_URL = "https://realwesiteforrpac.vercel.app/"
 SLOW_MO_MS = 700
 STEP_PAUSE_MS = 500
-HEADLESS = os.getenv("HEADLESS", "false").strip().lower() in {"1", "true", "yes"}
+HEADLESS = os.getenv("HEADLESS", "true").strip().lower() in {"1", "true", "yes"}
 BOT_ID = "RPA-0020"
 MONITOR_URL = os.getenv("MONITOR_URL", "http://localhost:8000/heartbeat")
 HEARTBEAT_INTERVAL = float(os.getenv("HEARTBEAT_INTERVAL", "3"))
 HEARTBEAT_ENABLED = os.getenv("HEARTBEAT_ENABLED", "true").strip().lower() in {"1", "true", "yes"}
+KEEP_ALIVE_AFTER_SUCCESS = os.getenv("KEEP_ALIVE_AFTER_SUCCESS", "true").strip().lower() in {"1", "true", "yes"}
 FAILURE_WEBHOOK_URL = os.getenv("BOT_FAILURE_WEBHOOK_URL", "")
 FAILURE_SNAPSHOT_DIR = "rpa"
 SCRIPT_PATH = "distributed_self_healing_orchestrator/dummy_bot/rpa/form_filler_bot.py"
@@ -201,6 +203,7 @@ def heartbeat_loop(stop_event: threading.Event) -> None:
 def run() -> None:
     stop_event = threading.Event()
     heartbeat_thread = None
+    run_succeeded = False
     if HEARTBEAT_ENABLED:
         heartbeat_thread = threading.Thread(target=heartbeat_loop, args=(stop_event,), daemon=True)
         heartbeat_thread.start()
@@ -208,7 +211,13 @@ def run() -> None:
         print("Heartbeat disabled via HEARTBEAT_ENABLED=false")
 
     with sync_playwright() as p:
-        browser = p.chromium.launch(headless=HEADLESS, slow_mo=SLOW_MO_MS)
+        effective_headless = HEADLESS
+        if os.name != "nt" and not effective_headless and not os.getenv("DISPLAY", "").strip():
+            # Avoid headed-launch crashes in Linux containers without an X server.
+            print("DISPLAY is not set. Falling back to headless=true for Playwright launch.")
+            effective_headless = True
+
+        browser = p.chromium.launch(headless=effective_headless, slow_mo=SLOW_MO_MS)
         page = browser.new_page(viewport={"width": 1400, "height": 900})
 
         try:
@@ -254,6 +263,7 @@ def run() -> None:
             )
 
             print("RPA bot finished: customer form submitted and record verified.")
+            run_succeeded = True
 
         except Exception as exc:
             # Stop heartbeats immediately when the bot fails.
@@ -275,11 +285,25 @@ def run() -> None:
                 print("Could not send failure payload.")
                 print(f"Payload error: {payload_exc}")
         finally:
-            stop_event.set()
+            # Keep heartbeats alive after success so monitor doesn't mark the bot as failed by timeout.
+            if not (run_succeeded and HEARTBEAT_ENABLED and KEEP_ALIVE_AFTER_SUCCESS):
+                stop_event.set()
             if heartbeat_thread is not None:
                 heartbeat_thread.join(timeout=2)
             page.wait_for_timeout(1500)
             browser.close()
+
+    if run_succeeded and HEARTBEAT_ENABLED and KEEP_ALIVE_AFTER_SUCCESS:
+        print("Run succeeded. Entering idle heartbeat mode. Press Ctrl+C to stop.")
+        try:
+            while True:
+                time.sleep(30)
+        except KeyboardInterrupt:
+            pass
+        finally:
+            stop_event.set()
+            if heartbeat_thread is not None:
+                heartbeat_thread.join(timeout=2)
 
 
 if __name__ == "__main__":

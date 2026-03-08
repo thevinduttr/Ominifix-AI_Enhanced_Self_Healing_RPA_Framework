@@ -248,7 +248,7 @@ def run() -> None:
             page.wait_for_timeout(STEP_PAUSE_MS)
 
             # Keep a direct literal selector for the healing patcher (.click("...")) compatibility.
-            page.click("main .content-grid article.panel form.form-grid .button-row button[type='submit_not_exist']")
+            page.click("button[type=\"submit\"]")
 
             page.locator(SELECTORS["status"]).filter(has_text="New customer added successfully.").wait_for(
                 state="visible",

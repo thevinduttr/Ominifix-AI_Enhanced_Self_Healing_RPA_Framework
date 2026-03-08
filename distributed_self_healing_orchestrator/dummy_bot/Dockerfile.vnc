@@ -1,0 +1,17 @@
+FROM ominifix-ai_enhanced_self_healing_rpa_framework-bot_form_filler_rpa:latest
+
+WORKDIR /app
+
+RUN set -e; \
+        for i in 1 2 3; do apt-get update && break || sleep 3; done; \
+        apt-get install -y --no-install-recommends \
+            fluxbox \
+            x11vnc \
+            novnc \
+            websockify \
+            && rm -rf /var/lib/apt/lists/*
+
+COPY dummy_bot /app
+RUN chmod +x /app/start_bot_vnc.sh
+
+CMD ["/bin/bash", "/app/start_bot_vnc.sh"]

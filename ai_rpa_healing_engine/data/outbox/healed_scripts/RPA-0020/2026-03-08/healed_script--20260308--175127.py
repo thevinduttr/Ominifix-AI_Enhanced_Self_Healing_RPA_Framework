@@ -10,7 +10,7 @@ from playwright.sync_api import sync_playwright
 APP_URL = "https://realwesiteforrpac.vercel.app/"
 SLOW_MO_MS = 700
 STEP_PAUSE_MS = 500
-HEADLESS = os.getenv("HEADLESS", "false").strip().lower() in {"1", "true", "yes"}
+HEADLESS = os.getenv("HEADLESS", "true").strip().lower() in {"1", "true", "yes"}
 BOT_ID = "RPA-0020"
 MONITOR_URL = os.getenv("MONITOR_URL", "http://localhost:8000/heartbeat")
 HEARTBEAT_INTERVAL = float(os.getenv("HEARTBEAT_INTERVAL", "3"))
@@ -211,7 +211,13 @@ def run() -> None:
         print("Heartbeat disabled via HEARTBEAT_ENABLED=false")
 
     with sync_playwright() as p:
-        browser = p.chromium.launch(headless=HEADLESS, slow_mo=SLOW_MO_MS)
+        effective_headless = HEADLESS
+        if os.name != "nt" and not effective_headless and not os.getenv("DISPLAY", "").strip():
+            # Avoid headed-launch crashes in Linux containers without an X server.
+            print("DISPLAY is not set. Falling back to headless=true for Playwright launch.")
+            effective_headless = True
+
+        browser = p.chromium.launch(headless=effective_headless, slow_mo=SLOW_MO_MS)
         page = browser.new_page(viewport={"width": 1400, "height": 900})
 
         try:

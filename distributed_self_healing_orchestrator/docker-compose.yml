@@ -161,6 +161,7 @@ services:
       - BOT_ID=RPA-0020
       - BOT_SERVICE_NAME=bot_form_filler_rpa
       - HEARTBEAT_INTERVAL=3
+      - HEADLESS=true
       - USE_HEALED_SCRIPT=true
       - HEALED_SCRIPTS_DIR=/app/healed_scripts
       - ORIGINAL_BOT_SCRIPT=/app/rpa/form_filler_bot.py
