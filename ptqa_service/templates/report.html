@@ -4,48 +4,256 @@
   <meta charset="utf-8" />
   <title>PTQA Report - {{ healing_id }}</title>
   <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    :root {
+      --bg: #0f1724;
+      --card: #0b1220;
+      --muted: #94a3b8;
+      --accent: #60a5fa;
+      --success: #10b981;
+      --danger: #ef4444;
+      --table-border: rgba(255, 255, 255, 0.06);
+    }
+    
+    body {
+      background: linear-gradient(180deg, #071021 0%, #071724 100%) !important;
+      color: #e6eef8 !important;
+    }
+    
+    .dark-card {
+      background-color: var(--card) !important;
+      border: 1px solid var(--table-border) !important;
+      color: #e6eef8 !important;
+    }
+    
+    .dark-text {
+      color: #e6eef8 !important;
+    }
+    
+    .dark-muted {
+      color: var(--muted) !important;
+    }
+    
+    .code-block {
+      background-color: #0a0e18 !important;
+      border: 1px solid var(--table-border) !important;
+      padding: 16px !important;
+      border-radius: 8px !important;
+      overflow-x: auto !important;
+      overflow-y: auto !important;
+      font-family: 'Fira Code', 'Courier New', monospace !important;
+      font-size: 13px !important;
+      line-height: 1.6 !important;
+      color: #e6eef8 !important;
+      min-height: 500px !important;
+      max-height: 600px !important;
+    }
+    
+    #reasonsContainer {
+      max-height: 500px !important;
+      overflow-y: auto !important;
+      padding: 8px !important;
+    }
+    
+    .code-block::-webkit-scrollbar {
+      height: 8px;
+    }
+    
+    .code-block::-webkit-scrollbar-track {
+      background: transparent;
+    }
+    
+    .code-block::-webkit-scrollbar-thumb {
+      background: var(--muted);
+      border-radius: 4px;
+    }
+    
+    .code-block::-webkit-scrollbar-thumb:hover {
+      background: var(--accent);
+    }
+    
+    .json-value {
+      color: #10b981;
+    }
+    
+    .json-key {
+      color: #60a5fa;
+    }
+    
+    .json-string {
+      color: #f97316;
+    }
+    
+    .json-number {
+      color: #a78bfa;
+    }
+    
+    .reason-item {
+      background-color: var(--card) !important;
+      border-left: 3px solid var(--accent) !important;
+      padding: 12px 16px !important;
+      margin-bottom: 12px !important;
+      border-radius: 4px !important;
+      line-height: 1.6 !important;
+    }
+    
+    .copy-btn {
+      background-color: var(--accent) !important;
+      color: white !important;
+      padding: 6px 12px !important;
+      border-radius: 4px !important;
+      border: none !important;
+      cursor: pointer !important;
+      font-size: 12px !important;
+      margin-bottom: 12px !important;
+    }
+    
+    .copy-btn:hover {
+      background-color: #3b82f6 !important;
+    }
+  </style>
 </head>
 
-<body class="bg-slate-50">
+<body>
   <div class="max-w-5xl mx-auto p-6">
     <div class="flex items-center justify-between">
       <div>
-        <h1 class="text-2xl font-bold">PTQA Report</h1>
-        <p class="text-slate-600 mt-1 font-mono">{{ healing_id }}</p>
+        <h1 class="text-2xl font-bold dark-text">PTQA Report</h1>
+        <p class="dark-muted mt-1 font-mono">{{ healing_id }}</p>
       </div>
-      <a href="/dashboard" class="underline text-sm">Back to dashboard</a>
+      <a href="/dashboard" class="underline text-sm hover:text-blue-400">Back to dashboard</a>
     </div>
 
-    <div class="bg-white rounded-xl shadow p-4 mt-6">
+    <div class="dark-card rounded-xl shadow p-4 mt-6">
       {% if row %}
         <div class="grid grid-cols-3 gap-3">
-          <div class="p-3 rounded bg-slate-100">
-            <div class="text-xs text-slate-500">Recommendation</div>
-            <div class="text-lg font-bold">{{ row.recommendation }}</div>
+          <div class="p-3 rounded" style="background-color: var(--bg); border: 1px solid var(--table-border);">
+            <div class="text-xs dark-muted">Recommendation</div>
+            <div class="text-lg font-bold dark-text">{{ row.recommendation }}</div>
           </div>
-          <div class="p-3 rounded bg-slate-100">
-            <div class="text-xs text-slate-500">Risk</div>
-            <div class="text-lg font-bold">{{ row.risk_level }}</div>
+          <div class="p-3 rounded" style="background-color: var(--bg); border: 1px solid var(--table-border);">
+            <div class="text-xs dark-muted">Risk</div>
+            <div class="text-lg font-bold dark-text">{{ row.risk_level }}</div>
           </div>
-          <div class="p-3 rounded bg-slate-100">
-            <div class="text-xs text-slate-500">Confidence</div>
-            <div class="text-lg font-bold">{{ "%.3f"|format(row.confidence or 0) }}</div>
+          <div class="p-3 rounded" style="background-color: var(--bg); border: 1px solid var(--table-border);">
+            <div class="text-xs dark-muted">Confidence</div>
+            <div class="text-lg font-bold dark-text">{{ "%.3f"|format(row.confidence or 0) }}</div>
           </div>
         </div>
 
-        <div class="mt-4">
-          <h2 class="font-semibold">Reasons</h2>
-          <pre class="mt-2 bg-slate-900 text-slate-100 p-3 rounded text-xs overflow-auto">{{ row.reasons }}</pre>
+        <div class="mt-6">
+          <h2 class="font-semibold text-lg dark-text mb-4">Reasons</h2>
+          <div id="reasonsContainer"></div>
         </div>
 
-        <div class="mt-4">
-          <h2 class="font-semibold">Raw Payload</h2>
-          <pre class="mt-2 bg-slate-900 text-slate-100 p-3 rounded text-xs overflow-auto">{{ row.raw_payload }}</pre>
+        <div class="mt-6">
+          <div class="flex items-center justify-between mb-4">
+            <h2 class="font-semibold text-lg dark-text">Raw Payload</h2>
+            <button class="copy-btn" onclick="copyToClipboard('rawPayloadText')">Copy JSON</button>
+          </div>
+          <pre id="rawPayloadText" class="code-block">{{ row.raw_payload }}</pre>
         </div>
       {% else %}
-        <div class="text-red-700">No report found in SQLite for healing_id={{ healing_id }}</div>
+        <div class="text-red-400">No report found in SQLite for healing_id={{ healing_id }}</div>
       {% endif %}
     </div>
   </div>
-</body>
+
+  <script>
+    // Decode HTML entities
+    function decodeHtmlEntities(text) {
+      const textArea = document.createElement('textarea');
+      textArea.innerHTML = text;
+      return textArea.value;
+    }
+    
+    // Format and display reasons
+    function formatReasons() {
+      const reasonsRaw = `{{ row.reasons }}`;
+      const reasonsContainer = document.getElementById('reasonsContainer');
+      
+      if (!reasonsRaw || reasonsRaw.trim() === '') {
+        reasonsContainer.innerHTML = '<div class="dark-text text-sm dark-muted">No reasons provided</div>';
+        return;
+      }
+      
+      // Decode HTML entities first
+      const decoded = decodeHtmlEntities(reasonsRaw);
+      
+      try {
+        // Try to parse as JSON array
+        const reasonsArray = JSON.parse(decoded);
+        if (Array.isArray(reasonsArray)) {
+          reasonsContainer.innerHTML = reasonsArray
+            .map(r => '<div class="reason-item">' + escapeHtml(r) + '</div>')
+            .join('');
+          return;
+        }
+      } catch (e) {
+        // Not JSON, try splitting by common patterns
+      }
+      
+      // Split by common separators and filter empty
+      const reasons = decoded
+        .split(/[\n•\-]/g)
+        .map(r => r.trim())
+        .filter(r => r.length > 0 && r.length > 5);
+      
+      if (reasons.length === 0) {
+        reasonsContainer.innerHTML = '<div class="reason-item">' + escapeHtml(decoded) + '</div>';
+      } else {
+        reasonsContainer.innerHTML = reasons
+          .map(r => '<div class="reason-item">' + escapeHtml(r) + '</div>')
+          .join('');
+      }
+    }
+    
+    // Format JSON with syntax highlighting
+    function formatJSON(jsonString) {
+      try {
+        // Decode HTML entities first
+        const decoded = decodeHtmlEntities(jsonString);
+        const json = JSON.parse(decoded);
+        return JSON.stringify(json, null, 2);
+      } catch (e) {
+        return decodeHtmlEntities(jsonString);
+      }
+    }
+    
+    // Escape HTML
+    function escapeHtml(text) {
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
+    }
+    
+    // Copy to clipboard
+    function copyToClipboard(elementId) {
+      const element = document.getElementById(elementId);
+      const text = element.innerText;
+      
+      navigator.clipboard.writeText(text).then(() => {
+        const btn = event.target;
+        const originalText = btn.innerText;
+        btn.innerText = '✓ Copied!';
+        setTimeout(() => {
+          btn.innerText = originalText;
+        }, 2000);
+      }).catch(err => {
+        alert('Failed to copy: ' + err);
+      });
+    }
+    
+    // Initialize on page load
+    window.addEventListener('load', function() {
+      formatReasons();
+      
+      // Format the raw payload JSON
+      const rawPayload = document.getElementById('rawPayloadText');
+      if (rawPayload) {
+        const formatted = formatJSON(rawPayload.innerText);
+        rawPayload.innerText = formatted;
+      }
+    });
+  </script>
 </html>
