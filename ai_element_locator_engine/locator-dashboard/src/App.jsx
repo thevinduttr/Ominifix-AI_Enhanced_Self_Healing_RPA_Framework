@@ -40,6 +40,15 @@ const ERROR_TYPE_ALIASES = {
   STALEELEMENTREFERENCE: "UI_SELECTOR_CHANGED",
 };
 
+// Fallback script mapping when upstream failures omit script metadata.
+const BOT_SCRIPT_HINTS = {
+  "RPA-0020": {
+    script_path:
+      "distributed_self_healing_orchestrator/dummy_bot/rpa/form_filler_bot.py",
+    failing_line: 231,
+  },
+};
+
 // Fixed metrics from your latest training run
 const MODEL_METRICS = {
   accuracy: 0.8488,
@@ -207,6 +216,9 @@ function App() {
   }
 
   function buildPayloadFromFailure(failure) {
+    const failureMeta = failure?.metadata || {};
+    const botId = failure.botId || failureMeta.bot_id || null;
+    const scriptHint = botId ? BOT_SCRIPT_HINTS[botId] : null;
     return {
       page_url: failure.page_url || "about:blank",
       failure_type: failure.failure_type || failure.category || "ELEMENT_NOT_VISIBLE",
@@ -220,11 +232,21 @@ function App() {
       screenshot_path: failure.screenshot_path || null,
       template_path: failure.template_path || null,
       metadata: {
-        ...(failure.metadata || {}),
+        ...failureMeta,
         source: "distributed_self_healing_orchestrator",
-        bot_id: failure.botId || null,
-        script_path: failure.script_path || failure.scriptPath || null,
-        failing_line: failure.failing_line || failure.failingLine || null,
+        bot_id: botId,
+        script_path:
+          failure.script_path ||
+          failure.scriptPath ||
+          failureMeta.script_path ||
+          scriptHint?.script_path ||
+          null,
+        failing_line:
+          failure.failing_line ||
+          failure.failingLine ||
+          failureMeta.failing_line ||
+          scriptHint?.failing_line ||
+          null,
         classification: getFailureClassification(failure),
         auto_routed: true,
       },

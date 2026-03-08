@@ -13,6 +13,7 @@ Confidence-Aware Healing:
 import json
 import argparse
 import logging
+import os
 from pathlib import Path
 
 from src.utils.path_manager import PathManager
@@ -32,6 +33,9 @@ MODEL_PATH = "models/strategy_selector_v1.pkl"
 MIN_CONFIDENCE_AGGRESSIVE = 0.70   # Use any best candidate
 MIN_CONFIDENCE_CONSERVATIVE = 0.50  # ID-based only
 # Below 0.50 = NO_FIX
+CONSERVATIVE_ALLOW_NON_ID_MIN_SCORE = float(
+    os.environ.get("CONSERVATIVE_ALLOW_NON_ID_MIN_SCORE", "0.90")
+)
 
 
 def load_json(p: Path) -> dict:
@@ -145,8 +149,14 @@ def heal_from_dict(inp: dict, *, persist: bool = True) -> dict:
         
         # Check if best candidate is ID-based
         best_value = best.get("value", "")
-        if best_value.startswith("#") or (best.get("type") == "css" and "#" in best_value.split("[", 1)[0]):
+        best_type = (best.get("type") or "").lower()
+        best_score = (best.get("score") or 0) / 100.0
+
+        if best_value.startswith("#") or (best_type == "css" and "#" in best_value.split("[", 1)[0]):
             # Safe: ID-based selector
+            selected_locator = best_value
+        elif best_type == "css" and best_score >= CONSERVATIVE_ALLOW_NON_ID_MIN_SCORE:
+            # Safe fallback: very high-confidence CSS selector from locator engine.
             selected_locator = best_value
         else:
             # Unsafe: reject non-ID selectors in conservative mode
@@ -159,7 +169,8 @@ def heal_from_dict(inp: dict, *, persist: bool = True) -> dict:
                 "valid": True,
                 "reason": (
                     f"Conservative mode: ML confidence {pred.confidence:.4f} < {MIN_CONFIDENCE_AGGRESSIVE:.2f}. "
-                    f"Best candidate '{best_value}' is not ID-based. Rejecting to prevent incorrect healing."
+                    f"Best candidate '{best_value}' is not ID-based and score {best_score:.4f} "
+                    f"< {CONSERVATIVE_ALLOW_NON_ID_MIN_SCORE:.2f}. Rejecting to prevent incorrect healing."
                 )
             }
             out["script_output"]["original_script_path"] = str(resolved_script)

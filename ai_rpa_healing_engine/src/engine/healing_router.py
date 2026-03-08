@@ -8,6 +8,8 @@ SUPPORTED_ACTIONS = {"click", "fill", "wait_for_selector", "query_selector_all",
 
 HEALABLE_ERRORS = {
     "ELEMENT_NOT_FOUND",
+    "ELEMENT_NOT_VISIBLE",
+    "TIMEOUT_ERROR",
     "TIMEOUT_WAITING_FOR_SELECTOR",
     "STRICT_MODE_VIOLATION",
     "DETACHED_FROM_DOM",

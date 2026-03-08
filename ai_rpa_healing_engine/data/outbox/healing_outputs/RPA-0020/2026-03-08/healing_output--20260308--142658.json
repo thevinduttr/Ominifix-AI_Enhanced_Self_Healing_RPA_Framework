@@ -1,0 +1,58 @@
+{
+  "metadata": {
+    "healing_id": "HEAL-a444811a-2970-4934-8452-b48378676816",
+    "report_id": "ELR-7ae80d8f-9248-4f55-aa90-3d084639b964",
+    "run_id": "RUN-PP1-BUTTON-TO-A-20260308142622",
+    "bot_id": "RPA-0020",
+    "timestamp": "2026-03-08T14:26:58.599786",
+    "source_component": "code_healing_engine",
+    "target_component": "code_healing_engine"
+  },
+  "failure_context": {
+    "script_path": "distributed_self_healing_orchestrator/dummy_bot/rpa/form_filler_bot.py",
+    "failing_line": 231,
+    "action": "click",
+    "old_locator": "main .content-grid article.panel form.form-grid .button-row button[type='submit_not_exist']",
+    "error_type": "TIMEOUT_ERROR",
+    "error_message": "Page.click: Timeout 30000ms exceeded.\nCall log:\n  - waiting for locator(\"main .content-grid article.panel form.form-grid .button-row button[type='submit_not_exist']\")\n"
+  },
+  "dom_context": {
+    "page_url": "https://realwesiteforrpac.vercel.app/",
+    "page_name": "",
+    "new_element_html": "<button type=\"submit\">Add Customer</button>"
+  },
+  "element_expectation": {
+    "expected_role": "primary_action",
+    "expected_text": "Add Customer"
+  },
+  "element_candidate": {
+    "css": "button[type=\"submit\"]",
+    "xpath": "/html/body/div/main/section[2]/article[1]/form/div/button[1]",
+    "full_xpath": "/html/body/div/main/section[2]/article[1]/form/div/button[1]",
+    "score": 100.0,
+    "strategy": "attribute_text_similarity"
+  },
+  "healing_summary": {
+    "status": "SUCCESS",
+    "strategy_used": "FALLBACK_LOCATOR",
+    "action": "click",
+    "old_locator": "main .content-grid article.panel form.form-grid .button-row button[type='submit_not_exist']",
+    "new_locator": "button[type=\"submit\"]",
+    "confidence": 0.9,
+    "patcher": "LibCST",
+    "validation": {
+      "valid": true,
+      "reason": "OK"
+    }
+  },
+  "script_output": {
+    "original_script_path": "/workspace/distributed_self_healing_orchestrator/dummy_bot/rpa/form_filler_bot.py",
+    "healed_script_path": "data/outbox/healed_scripts/RPA-0020/2026-03-08/healed_script--20260308--142658.py"
+  },
+  "model_info": {
+    "model": "strategy_selector_v1",
+    "confidence": 0.5312271534195105,
+    "healing_mode": "conservative",
+    "ml_confidence": 0.5312271534195105
+  }
+}

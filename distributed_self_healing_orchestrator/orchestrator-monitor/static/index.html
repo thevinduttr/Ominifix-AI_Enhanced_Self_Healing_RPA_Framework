@@ -72,6 +72,47 @@
       color:var(--muted);
     }
 
+    .detail-loading-grid{
+      display:grid;
+      gap:12px;
+    }
+
+    .skeleton-card{
+      border:1px solid rgba(255,255,255,0.08);
+      border-radius:10px;
+      padding:12px;
+      background:rgba(255,255,255,0.02);
+    }
+
+    .skeleton-title,
+    .skeleton-line{
+      border-radius:8px;
+      background:linear-gradient(90deg, rgba(255,255,255,0.07) 25%, rgba(255,255,255,0.16) 50%, rgba(255,255,255,0.07) 75%);
+      background-size:220% 100%;
+      animation:skeleton-shimmer 1.2s infinite;
+    }
+
+    .skeleton-title{
+      height:16px;
+      width:45%;
+      margin-bottom:12px;
+    }
+
+    .skeleton-line{
+      height:12px;
+      margin-bottom:10px;
+    }
+
+    .skeleton-line.w40{width:40%}
+    .skeleton-line.w65{width:65%}
+    .skeleton-line.w80{width:80%}
+    .skeleton-line.w90{width:90%}
+
+    @keyframes skeleton-shimmer{
+      0%{background-position:200% 0}
+      100%{background-position:-200% 0}
+    }
+
     /* Card Container */
     .card{
       background:linear-gradient(180deg,rgba(255,255,255,0.04),rgba(255,255,255,0.02));

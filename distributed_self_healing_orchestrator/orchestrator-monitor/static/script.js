@@ -190,12 +190,85 @@ function looksLikeLocatorReport(value){
   return !!(obj.failure_context && obj.element_expectation && obj.metadata);
 }
 
-function showFailureJson(failure){
+function failureLoadingHtml(){
+  const block = `
+    <div class="skeleton-card">
+      <div class="skeleton-title"></div>
+      <div class="skeleton-line w40"></div>
+      <div class="skeleton-line w90"></div>
+      <div class="skeleton-line w80"></div>
+      <div class="skeleton-line w65"></div>
+    </div>
+  `;
+  return `<div class="detail-loading-grid">${block}${block}${block}${block}</div>`;
+}
+
+function openFailureModalLoading(){
+  const modal = document.getElementById('failure-modal');
+  const pre = document.getElementById('failure-json-pre');
+  const sectionsEl = document.getElementById('failure-sections');
+  const rawBtn = document.getElementById('failure-toggle-raw');
+  const domContainer = document.getElementById('failure-dom-container');
+  const renderBtn = document.getElementById('failure-render-dom');
+  if(!modal || !sectionsEl) return false;
+
+  sectionsEl.innerHTML = failureLoadingHtml();
+  if(pre) pre.style.display = 'none';
+  if(rawBtn){
+    rawBtn.textContent = 'Show Raw JSON (Debug)';
+    rawBtn.onclick = null;
+  }
+  if(domContainer){
+    domContainer.innerHTML = '';
+    domContainer.style.display = 'none';
+  }
+  if(renderBtn) renderBtn.style.display = 'none';
+
+  modal.style.display = 'flex';
+  return true;
+}
+
+function sameFailure(a, b){
+  if(!a || !b) return false;
+  const ar = a.locator_report_id || a.locator_report?.metadata?.report_id;
+  const br = b.locator_report_id || b.locator_report?.metadata?.report_id;
+  if(ar && br && ar === br) return true;
+
+  const at = Number(a.timestamp || 0);
+  const bt = Number(b.timestamp || 0);
+  if((a.botId || '') === (b.botId || '') && at && bt && Math.abs(at - bt) < 0.01) return true;
+  return false;
+}
+
+async function resolveLatestFailure(currentFailure){
+  try{
+    const res = await fetch('/status');
+    if(!res.ok) return currentFailure;
+    const data = await res.json();
+    const list = Array.isArray(data.failures) ? data.failures : [];
+    for(const item of list){
+      if(sameFailure(item, currentFailure)) return item;
+    }
+    if(currentFailure?.botId){
+      const latestByBot = list.find((item) => item && item.botId === currentFailure.botId);
+      if(latestByBot) return latestByBot;
+    }
+    return currentFailure;
+  }catch(_err){
+    return currentFailure;
+  }
+}
+
+async function showFailureJson(failure){
   const modal = document.getElementById('failure-modal');
   const pre = document.getElementById('failure-json-pre');
   const sectionsEl = document.getElementById('failure-sections');
   const rawBtn = document.getElementById('failure-toggle-raw');
   if(!modal || !pre || !sectionsEl) return;
+
+  openFailureModalLoading();
+  const resolvedFailure = await resolveLatestFailure(failure);
+  failure = resolvedFailure || failure;
 
   // pretty-print JSON for debug mode
   try{

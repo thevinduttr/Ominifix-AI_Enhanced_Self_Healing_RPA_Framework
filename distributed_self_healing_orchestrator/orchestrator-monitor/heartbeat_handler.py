@@ -14,6 +14,8 @@ DEFAULT_HEALING_ENGINE_URL = os.environ.get('HEALING_ENGINE_URL', 'http://ai_rpa
 HEALING_READ_TIMEOUT_SECONDS = float(os.environ.get("HEALING_READ_TIMEOUT_SECONDS", "30"))
 DEFAULT_PTQA_URL = os.environ.get('PTQA_SERVICE_URL', 'http://ptqa_service:8000/ptqa/evaluate-healing')
 PTQA_READ_TIMEOUT_SECONDS = float(os.environ.get("PTQA_READ_TIMEOUT_SECONDS", "30"))
+PTQA_RESTART_DELAY_SECONDS = float(os.environ.get("PTQA_RESTART_DELAY_SECONDS", "3"))
+RESTART_ONLY_ON_PTQA_APPROVAL = os.environ.get("RESTART_ONLY_ON_PTQA_APPROVAL", "true").strip().lower() in {"1", "true", "yes"}
 RESTART_ON_CATEGORIES = {
     c.strip().upper()
     for c in os.environ.get(
@@ -35,6 +37,40 @@ PTQA_APPROVED_RECOMMENDATIONS = {
 }
 
 
+def _parse_bot_service_map(raw_value):
+    """Parse BOT_SERVICE_MAP like: RPA-0020:form_filler_bot,RPA-0030:other_service."""
+    mapping = {}
+    for pair in str(raw_value or "").split(","):
+        token = pair.strip()
+        if not token or ":" not in token:
+            continue
+        bot_id, service = token.split(":", 1)
+        bot_id = bot_id.strip()
+        service = service.strip()
+        if bot_id and service:
+            mapping[bot_id] = service
+    return mapping
+
+
+BOT_SERVICE_MAP = _parse_bot_service_map(os.environ.get("BOT_SERVICE_MAP", ""))
+
+
+def _extract_ptqa_recommendation(data):
+    """Read recommendation from common payload shapes used by monitor/PTQA integration."""
+    if not isinstance(data, dict):
+        return ""
+
+    # Preferred: nested PTQA result object.
+    ptqa_result = data.get('ptqa_result')
+    if isinstance(ptqa_result, dict):
+        rec = str(ptqa_result.get('recommendation') or '').strip()
+        if rec:
+            return rec
+
+    # Fallback: recommendation sent as a top-level field.
+    return str(data.get('recommendation') or '').strip()
+
+
 def _get_docker_client():
     global _docker_client
     if _docker_client is None:
@@ -43,6 +79,9 @@ def _get_docker_client():
 
 
 def _restart_bot_for_category(failure):
+    if RESTART_ONLY_ON_PTQA_APPROVAL:
+        return
+
     category = (failure.get('category') or '').strip().upper()
     if category not in RESTART_ON_CATEGORIES:
         return
@@ -78,9 +117,19 @@ def _restart_bot_for_category(failure):
         failure['bot_restart_error'] = str(e)
 
 
-def _find_container_for_bot(bot_id):
-    """Resolve container by compose service name first, then BOT_ID env fallback."""
+def _find_container_for_bot(bot_id, service_hint=None):
+    """Resolve container by hint/map, then compose service name, then BOT_ID env fallback."""
     client = _get_docker_client()
+
+    # Preferred: explicit service hint from payload metadata or env map.
+    hinted_service = (service_hint or "").strip() or BOT_SERVICE_MAP.get(bot_id, "")
+    if hinted_service:
+        hinted = client.containers.list(
+            all=True,
+            filters={"label": f"com.docker.compose.service={hinted_service}"},
+        )
+        if hinted:
+            return hinted[0]
 
     # Fast path: botId matches compose service name.
     direct = client.containers.list(
@@ -108,6 +157,11 @@ def _restart_bot_on_ptqa_approval(failure, ptqa_result):
     if not isinstance(ptqa_result, dict):
         return
 
+    # Prevent duplicate restarts for the same failure event.
+    existing = failure.get('ptqa_restart') or {}
+    if existing.get('status') == 'restarted':
+        return
+
     recommendation = str(ptqa_result.get('recommendation') or '').strip().upper()
     if recommendation not in PTQA_APPROVED_RECOMMENDATIONS:
         return
@@ -118,12 +172,31 @@ def _restart_bot_on_ptqa_approval(failure, ptqa_result):
         return
 
     try:
-        container = _find_container_for_bot(bot_id)
+        metadata = failure.get('metadata') or {}
+        service_hint = metadata.get('bot_service') or metadata.get('compose_service')
+        container = _find_container_for_bot(bot_id, service_hint=service_hint)
         if container is None:
-            failure['ptqa_restart_error'] = f"no container found for botId '{bot_id}'"
+            if service_hint:
+                failure['ptqa_restart_error'] = (
+                    f"no container found for botId '{bot_id}' using service_hint '{service_hint}'"
+                )
+            elif BOT_SERVICE_MAP.get(bot_id):
+                failure['ptqa_restart_error'] = (
+                    f"no container found for botId '{bot_id}' using BOT_SERVICE_MAP service '{BOT_SERVICE_MAP.get(bot_id)}'"
+                )
+            else:
+                failure['ptqa_restart_error'] = (
+                    f"no container found for botId '{bot_id}'. "
+                    f"Set metadata.bot_service or BOT_SERVICE_MAP={bot_id}:<compose_service>."
+                )
             return
 
         service_name = (container.labels or {}).get('com.docker.compose.service') or container.name
+
+        restart_delay = max(0.0, PTQA_RESTART_DELAY_SECONDS)
+        if restart_delay > 0:
+            time.sleep(restart_delay)
+
         container.restart(timeout=10)
 
         failure['ptqa_restart'] = {
@@ -133,6 +206,7 @@ def _restart_bot_on_ptqa_approval(failure, ptqa_result):
             'bot_id': bot_id,
             'service': service_name,
             'container': container.name,
+            'delay_seconds': restart_delay,
             'timestamp': time.time(),
             'status': 'restarted',
         }
@@ -433,6 +507,13 @@ def process_failure(data):
         'screenshot_path': data.get('screenshot_path'),
         'metadata': data.get('metadata')
     }
+
+    # Preserve recommendation payload when it is already available at report time.
+    if isinstance(data.get('ptqa_result'), dict):
+        failure['ptqa_result'] = data.get('ptqa_result')
+    incoming_recommendation = _extract_ptqa_recommendation(data)
+    if incoming_recommendation and 'ptqa_result' not in failure:
+        failure['ptqa_result'] = {'recommendation': incoming_recommendation}
     
     print(f"🔍 Created failure object with keys: {list(failure.keys())}")
     print(f"🔍 Failure has page_url: {failure.get('page_url')}")
@@ -476,6 +557,8 @@ def process_failure(data):
     category = _normalize_locator_category(failure.get('failure_type') or failure.get('category'))
     if category == 'AUTHENTICATION_ERROR':
         _queue_direct_healing_request(failure)
+
+    # Restart is intentionally triggered only after PTQA service evaluation response.
 
     return {'status': 'recorded'}
 

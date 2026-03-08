@@ -36,6 +36,7 @@ services:
       #MODEL_URL: https://rpa-error-classifier-555972249634.us-central1.run.app/predict
       MODEL_URL: http://model_server:8002/classify --- IGNORE ---  # Local model server (for testing)
       RABBIT_HOST: rabbitmq
+      BOT_SERVICE_MAP: RPA-0020:bot_form_filler_rpa
     depends_on:
       - rabbitmq
       - model_server
@@ -146,6 +147,25 @@ services:
       - FAILURE_EVERY=4
       - TARGET_URL=https://www.wikipedia.org/
       - MISSING_SELECTOR=#non_existing_checkout_button
+    depends_on:
+      - orchestrator_monitor
+
+  bot_form_filler_rpa:
+    build:
+      context: .
+      dockerfile: dummy_bot/Dockerfile
+    container_name: ominifix_bot_form_filler_rpa
+    command: ["python", "rpa/run_healed_or_original.py"]
+    environment:
+      - MONITOR_URL=http://orchestrator_monitor:8000/heartbeat
+      - BOT_ID=RPA-0020
+      - BOT_SERVICE_NAME=bot_form_filler_rpa
+      - HEARTBEAT_INTERVAL=3
+      - USE_HEALED_SCRIPT=true
+      - HEALED_SCRIPTS_DIR=/app/healed_scripts
+      - ORIGINAL_BOT_SCRIPT=/app/rpa/form_filler_bot.py
+    volumes:
+      - ../ai_rpa_healing_engine/data/outbox/healed_scripts:/app/healed_scripts:ro
     depends_on:
       - orchestrator_monitor
 

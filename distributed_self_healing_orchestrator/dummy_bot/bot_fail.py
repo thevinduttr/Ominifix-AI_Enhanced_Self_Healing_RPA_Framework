@@ -8,8 +8,27 @@ MONITOR_URL = os.environ.get('MONITOR_URL', 'http://localhost:8000/heartbeat')
 BOT_ID = os.environ.get('BOT_ID', 'BOT-FAIL-' + str(random.randint(2000, 2999)))
 HEARTBEATS = int(os.environ.get('HEARTBEATS', '5'))  # how many heartbeats to send before failing
 INTERVAL = float(os.environ.get('INTERVAL', '3'))
+STARTUP_WAIT_SECONDS = float(os.environ.get('STARTUP_WAIT_SECONDS', '25'))
+
+
+def wait_for_monitor_ready(timeout_seconds: float) -> bool:
+    """Wait until monitor heartbeat endpoint accepts requests to avoid startup race errors."""
+    deadline = time.time() + max(0.0, timeout_seconds)
+    while time.time() < deadline:
+        try:
+            r = requests.post(MONITOR_URL, json={"botId": BOT_ID}, timeout=2)
+            if r.ok:
+                print(f'Monitor ready for {BOT_ID}')
+                return True
+        except Exception:
+            pass
+        time.sleep(1)
+    return False
 
 print(f'Bot_fail {BOT_ID} -> {MONITOR_URL}, will send {HEARTBEATS} heartbeats (interval {INTERVAL}s)')
+if not wait_for_monitor_ready(STARTUP_WAIT_SECONDS):
+    print(f'Warning: monitor not ready after {STARTUP_WAIT_SECONDS}s, continuing anyway.')
+
 count = 0
 while True:
     if count < HEARTBEATS:

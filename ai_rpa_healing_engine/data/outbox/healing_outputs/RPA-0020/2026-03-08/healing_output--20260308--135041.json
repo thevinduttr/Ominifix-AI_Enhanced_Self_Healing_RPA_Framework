@@ -1,0 +1,55 @@
+{
+  "metadata": {
+    "healing_id": "HEAL-6e0d9b8a-8e6b-4fcf-8c0d-e15a4fb68a7b",
+    "report_id": "ELR-test-mount",
+    "run_id": "RUN-test-mount",
+    "bot_id": "RPA-0020",
+    "timestamp": "2026-03-08T13:50:41.177670",
+    "source_component": "code_healing_engine",
+    "target_component": "code_healing_engine"
+  },
+  "failure_context": {
+    "script_path": "distributed_self_healing_orchestrator/dummy_bot/rpa/form_filler_bot.py",
+    "failing_line": 245,
+    "action": "click",
+    "old_locator": "main .content-grid article.panel form.form-grid .button-row button[type='submit_not_exist']",
+    "error_type": "TIMEOUT_ERROR",
+    "error_message": "test"
+  },
+  "dom_context": {
+    "page_url": "https://realwesiteforrpac.vercel.app/",
+    "page_name": "",
+    "new_element_html": ""
+  },
+  "element_expectation": {
+    "expected_role": "primary_action",
+    "expected_text": "Add Customer"
+  },
+  "element_candidate": {
+    "css": "button[type=\"submit\"]",
+    "xpath": "/html/body/div/main/section[2]/article[1]/form/div/button[1]",
+    "score": 100.0,
+    "strategy": "attribute_text_similarity"
+  },
+  "healing_summary": {
+    "status": "NO_FIX",
+    "strategy_used": "NO_FIX",
+    "action": "click",
+    "old_locator": "main .content-grid article.panel form.form-grid .button-row button[type='submit_not_exist']",
+    "new_locator": "",
+    "confidence": 0.0,
+    "patcher": "N/A",
+    "validation": {
+      "valid": true,
+      "reason": "Missing dom_context.new_element_html; cannot regenerate locator."
+    }
+  },
+  "script_output": {
+    "original_script_path": "/workspace/distributed_self_healing_orchestrator/dummy_bot/rpa/form_filler_bot.py",
+    "healed_script_path": ""
+  },
+  "model_info": {
+    "model": "strategy_selector_v1",
+    "confidence": 0.5238327275916721
+  }
+}
