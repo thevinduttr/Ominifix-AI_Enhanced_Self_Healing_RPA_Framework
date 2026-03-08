@@ -201,7 +201,8 @@ function App() {
     const classification = getFailureClassification(failure);
     return (
       classification === "UI_SELECTOR_CHANGED" ||
-      classification === "ELEMENT_NOT_VISIBLE"
+      classification === "ELEMENT_NOT_VISIBLE" ||
+      classification === "TIMEOUT_ERROR"
     );
   }
 

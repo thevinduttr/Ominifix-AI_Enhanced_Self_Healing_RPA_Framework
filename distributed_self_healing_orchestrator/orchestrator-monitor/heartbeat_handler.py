@@ -18,7 +18,7 @@ RESTART_ON_CATEGORIES = {
     c.strip().upper()
     for c in os.environ.get(
         "RESTART_ON_CATEGORIES",
-        "TIMEOUT_ERROR,NETWORK_ERROR,UNKNOWN,BOT_ERROR",
+        "NETWORK_ERROR,UNKNOWN,BOT_ERROR",
     ).split(",")
     if c.strip()
 }
@@ -152,6 +152,8 @@ def _normalize_locator_category(raw_value):
         'NO_SUCH_ELEMENT': 'ELEMENT_NOT_VISIBLE',
         'ELEMENTNOTINTERACTABLE': 'ELEMENT_NOT_VISIBLE',
         'STALEELEMENTREFERENCE': 'UI_SELECTOR_CHANGED',
+        'TIMEOUTERROR': 'TIMEOUT_ERROR',
+        'TIMEOUT_EXCEPTION': 'TIMEOUT_ERROR',
     }
     return aliases.get(normalized, normalized)
 
@@ -163,7 +165,7 @@ def _should_send_to_locator(failure):
     else:
         current = failure.get('failure_type')
     normalized = _normalize_locator_category(current)
-    return normalized in {'UI_SELECTOR_CHANGED', 'ELEMENT_NOT_VISIBLE'}
+    return normalized in {'UI_SELECTOR_CHANGED', 'ELEMENT_NOT_VISIBLE', 'TIMEOUT_ERROR'}
 
 
 def _build_locator_payload(failure):
