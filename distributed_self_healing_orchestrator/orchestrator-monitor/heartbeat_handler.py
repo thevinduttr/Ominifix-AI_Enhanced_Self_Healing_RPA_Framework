@@ -257,6 +257,46 @@ def _restart_bot_on_ptqa_approval(failure, ptqa_result):
         failure['ptqa_restart_error'] = str(e)
 
 
+def _build_ptqa_evaluation_payload(failure, healing_result):
+    """Build complete PTQA evaluation payload with all required fields."""
+    if not isinstance(healing_result, dict):
+        return None
+    
+    metadata = failure.get('metadata') or {}
+    healing_summary = (healing_result.get('healing_summary') or {})
+    script_output = healing_result.get('script_output') or {}
+    
+    # Extract script paths from healing result
+    original_path = script_output.get('original_script_path')
+    healed_path = script_output.get('healed_script_path')
+    
+    # Use healing_id from healing result or generate unique one
+    healing_id = healing_result.get('healing_id') or f"HEAL-{int(failure.get('timestamp') or time.time())}"
+    
+    ptqa_payload = {
+        'metadata': {
+            'schema_version': '1.0',
+            'healing_id': healing_id,
+            'report_id': failure.get('locator_report_id') or f"PTQA-{int(time.time())}",
+            'run_id': metadata.get('run_id', ''),
+            'bot_id': failure.get('botId') or metadata.get('bot_id'),
+            'script_id': metadata.get('script_id') or metadata.get('bot_id'),
+            'environment': metadata.get('environment', 'production'),
+            'timestamp': time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime()),
+            'source_component': 'distributed_self_healing_orchestrator',
+        },
+        'script_output': {
+            'original_script_path': original_path or metadata.get('script_path'),
+            'healed_script_path': healed_path,
+        },
+        'healing_request': failure.get('healing_request'),
+        'healing_result': healing_result,
+        'raw_payload': failure.copy(),
+    }
+    
+    return ptqa_payload
+
+
 def _normalize_locator_category(raw_value):
     if raw_value is None:
         return 'UNKNOWN'
@@ -343,17 +383,22 @@ def _request_locator_report(failure):
         # Forward healing engine output to PTQA automatically.
         if healing_result_payload:
             try:
-                ptqa_resp = requests.post(
-                    DEFAULT_PTQA_URL,
-                    json=healing_result_payload,
-                    timeout=(5, PTQA_READ_TIMEOUT_SECONDS),
-                )
-                if ptqa_resp.ok:
-                    failure['ptqa_result'] = ptqa_resp.json()
-                    failure['ptqa_error'] = None
-                    _restart_bot_on_ptqa_approval(failure, failure['ptqa_result'])
+                # Build complete PTQA payload with metadata and script paths
+                ptqa_payload = _build_ptqa_evaluation_payload(failure, healing_result_payload)
+                if ptqa_payload:
+                    ptqa_resp = requests.post(
+                        DEFAULT_PTQA_URL,
+                        json=ptqa_payload,
+                        timeout=(5, PTQA_READ_TIMEOUT_SECONDS),
+                    )
+                    if ptqa_resp.ok:
+                        failure['ptqa_result'] = ptqa_resp.json()
+                        failure['ptqa_error'] = None
+                        _restart_bot_on_ptqa_approval(failure, failure['ptqa_result'])
+                    else:
+                        failure['ptqa_error'] = f"HTTP {ptqa_resp.status_code}: {ptqa_resp.text[:300]}"
                 else:
-                    failure['ptqa_error'] = f"HTTP {ptqa_resp.status_code}: {ptqa_resp.text[:300]}"
+                    failure['ptqa_error'] = "Failed to build PTQA payload"
             except Exception as ptqa_exc:
                 failure['ptqa_error'] = str(ptqa_exc)
 
@@ -449,17 +494,22 @@ def _request_direct_healing(failure):
             failure['healed_locator'] = hs.get('new_locator')
 
         try:
-            ptqa_resp = requests.post(
-                DEFAULT_PTQA_URL,
-                json=healing_result,
-                timeout=(5, PTQA_READ_TIMEOUT_SECONDS),
-            )
-            if ptqa_resp.ok:
-                failure['ptqa_result'] = ptqa_resp.json()
-                failure['ptqa_error'] = None
-                _restart_bot_on_ptqa_approval(failure, failure['ptqa_result'])
+            # Build complete PTQA payload with metadata and script paths
+            ptqa_payload = _build_ptqa_evaluation_payload(failure, healing_result)
+            if ptqa_payload:
+                ptqa_resp = requests.post(
+                    DEFAULT_PTQA_URL,
+                    json=ptqa_payload,
+                    timeout=(5, PTQA_READ_TIMEOUT_SECONDS),
+                )
+                if ptqa_resp.ok:
+                    failure['ptqa_result'] = ptqa_resp.json()
+                    failure['ptqa_error'] = None
+                    _restart_bot_on_ptqa_approval(failure, failure['ptqa_result'])
+                else:
+                    failure['ptqa_error'] = f"HTTP {ptqa_resp.status_code}: {ptqa_resp.text[:300]}"
             else:
-                failure['ptqa_error'] = f"HTTP {ptqa_resp.status_code}: {ptqa_resp.text[:300]}"
+                failure['ptqa_error'] = "Failed to build PTQA payload"
         except Exception as ptqa_exc:
             failure['ptqa_error'] = str(ptqa_exc)
 

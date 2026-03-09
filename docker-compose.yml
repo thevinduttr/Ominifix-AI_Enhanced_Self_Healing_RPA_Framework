@@ -154,16 +154,29 @@ services:
     depends_on:
       - orchestrator_monitor
 
-  bot_fail:
-    build:
-      context: ./distributed_self_healing_orchestrator
-      dockerfile: dummy_bot/Dockerfile
-    command: ["python","bot_fail.py"]
-    environment:
-      - MONITOR_URL=http://orchestrator_monitor:8000/heartbeat
-      - STARTUP_WAIT_SECONDS=25
-    depends_on:
-      - orchestrator_monitor
+  # bot_fail:
+  #   build:
+  #     context: ./distributed_self_healing_orchestrator
+  #     dockerfile: dummy_bot/Dockerfile
+  #   command: ["python","bot_fail.py"]
+  #   environment:
+  #     - MONITOR_URL=http://orchestrator_monitor:8000/heartbeat
+  #     - STARTUP_WAIT_SECONDS=25
+  #   depends_on:
+  #     - orchestrator_monitor
+
+  # bot23:
+  #   build:
+  #     context: ./distributed_self_healing_orchestrator
+  #     dockerfile: dummy_bot/Dockerfile
+  #   command: ["python", "bot23.py"]
+  #   environment:
+  #     - MONITOR_URL=http://orchestrator_monitor:8000/heartbeat
+  #     - BOT_ID=RPA-0023
+  #     - HEARTBEATS=5
+  #     - INTERVAL=4
+  #   depends_on:
+  #     - orchestrator_monitor
 
   bot23:
     build:

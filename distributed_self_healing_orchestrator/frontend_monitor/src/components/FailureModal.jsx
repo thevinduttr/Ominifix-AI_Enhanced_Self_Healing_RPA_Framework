@@ -302,8 +302,262 @@ function FailureModal({ failure, onClose }) {
 
           {ptqaResult && (
             <>
+              <div style={{ marginTop: '20px', marginBottom: '12px' }}>
+                <strong style={{ fontSize: '16px' }}>PTQA Service Details</strong>
+              </div>
+              <div
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
+                  gap: '12px',
+                  marginBottom: '16px',
+                }}
+              >
+                {/* Recommendation */}
+                <div
+                  style={{
+                    padding: '12px',
+                    borderRadius: '8px',
+                    background: 'rgba(255,255,255,0.03)',
+                    border: '1px solid rgba(255,255,255,0.06)',
+                  }}
+                >
+                  <div style={{ fontSize: '12px', color: 'var(--muted)', marginBottom: '6px' }}>
+                    Recommendation
+                  </div>
+                  <div
+                    style={{
+                      fontWeight: 700,
+                      color:
+                        ptqaResult.recommendation === 'APPROVE_HEALING'
+                          ? '#4ade80'
+                          : ptqaResult.recommendation === 'BLOCK_HEALING'
+                          ? '#f87171'
+                          : '#fbbf24',
+                    }}
+                  >
+                    {ptqaResult.recommendation || '-'}
+                  </div>
+                </div>
+
+                {/* Risk Level */}
+                <div
+                  style={{
+                    padding: '12px',
+                    borderRadius: '8px',
+                    background: 'rgba(255,255,255,0.03)',
+                    border: '1px solid rgba(255,255,255,0.06)',
+                  }}
+                >
+                  <div style={{ fontSize: '12px', color: 'var(--muted)', marginBottom: '6px' }}>
+                    Risk Level
+                  </div>
+                  <div style={{ fontWeight: 700 }}>{ptqaResult.risk_level || '-'}</div>
+                </div>
+
+                {/* Confidence */}
+                <div
+                  style={{
+                    padding: '12px',
+                    borderRadius: '8px',
+                    background: 'rgba(255,255,255,0.03)',
+                    border: '1px solid rgba(255,255,255,0.06)',
+                  }}
+                >
+                  <div style={{ fontSize: '12px', color: 'var(--muted)', marginBottom: '6px' }}>
+                    Confidence
+                  </div>
+                  <div style={{ fontWeight: 700 }}>
+                    {typeof ptqaResult.confidence === 'number'
+                      ? `${Math.round(ptqaResult.confidence * 100)}%`
+                      : '-'}
+                  </div>
+                </div>
+
+                {/* Will Work Probability */}
+                <div
+                  style={{
+                    padding: '12px',
+                    borderRadius: '8px',
+                    background: 'rgba(255,255,255,0.03)',
+                    border: '1px solid rgba(255,255,255,0.06)',
+                  }}
+                >
+                  <div style={{ fontSize: '12px', color: 'var(--muted)', marginBottom: '6px' }}>
+                    Will Work Probability
+                  </div>
+                  <div style={{ fontWeight: 700 }}>
+                    {typeof ptqaResult.will_work_probability === 'number'
+                      ? `${Math.round(ptqaResult.will_work_probability * 100)}%`
+                      : '-'}
+                  </div>
+                </div>
+
+                {/* Model Name */}
+                <div
+                  style={{
+                    padding: '12px',
+                    borderRadius: '8px',
+                    background: 'rgba(255,255,255,0.03)',
+                    border: '1px solid rgba(255,255,255,0.06)',
+                  }}
+                >
+                  <div style={{ fontSize: '12px', color: 'var(--muted)', marginBottom: '6px' }}>
+                    Model Name
+                  </div>
+                  <div style={{ fontWeight: 700, fontSize: '14px' }}>
+                    {ptqaResult.model_name || '-'}
+                  </div>
+                </div>
+
+                {/* Pass Rate (Before -> After) */}
+                {ptqaResult.before_results && ptqaResult.after_results && (
+                  <div
+                    style={{
+                      padding: '12px',
+                      borderRadius: '8px',
+                      background: 'rgba(255,255,255,0.03)',
+                      border: '1px solid rgba(255,255,255,0.06)',
+                    }}
+                  >
+                    <div style={{ fontSize: '12px', color: 'var(--muted)', marginBottom: '6px' }}>
+                      Pass Rate (Before → After)
+                    </div>
+                    <div style={{ fontWeight: 700 }}>
+                      {(() => {
+                        const beforeTotal = ptqaResult.before_results.total_tests || 0
+                        const beforePassed = ptqaResult.before_results.passed_tests || 0
+                        const afterTotal = ptqaResult.after_results.total_tests || 0
+                        const afterPassed = ptqaResult.after_results.passed_tests || 0
+                        const beforeRate =
+                          beforeTotal > 0 ? ((beforePassed / beforeTotal) * 100).toFixed(1) : '0.0'
+                        const afterRate =
+                          afterTotal > 0 ? ((afterPassed / afterTotal) * 100).toFixed(1) : '0.0'
+                        return `${beforeRate}% → ${afterRate}%`
+                      })()}
+                    </div>
+                  </div>
+                )}
+
+                {/* Pass Rate Delta */}
+                {ptqaResult.before_results && ptqaResult.after_results && (
+                  <div
+                    style={{
+                      padding: '12px',
+                      borderRadius: '8px',
+                      background: 'rgba(255,255,255,0.03)',
+                      border: '1px solid rgba(255,255,255,0.06)',
+                    }}
+                  >
+                    <div style={{ fontSize: '12px', color: 'var(--muted)', marginBottom: '6px' }}>
+                      Pass Rate Delta
+                    </div>
+                    <div style={{ fontWeight: 700 }}>
+                      {(() => {
+                        const beforeTotal = ptqaResult.before_results.total_tests || 0
+                        const beforePassed = ptqaResult.before_results.passed_tests || 0
+                        const afterTotal = ptqaResult.after_results.total_tests || 0
+                        const afterPassed = ptqaResult.after_results.passed_tests || 0
+                        const beforeRate = beforeTotal > 0 ? (beforePassed / beforeTotal) * 100 : 0
+                        const afterRate = afterTotal > 0 ? (afterPassed / afterTotal) * 100 : 0
+                        const delta = afterRate - beforeRate
+                        const color = delta > 0 ? '#4ade80' : delta < 0 ? '#f87171' : '#94a3b8'
+                        const sign = delta > 0 ? '+' : ''
+                        return (
+                          <span style={{ color }}>
+                            {sign}
+                            {delta.toFixed(1)}%
+                          </span>
+                        )
+                      })()}
+                    </div>
+                  </div>
+                )}
+
+                {/* Latency Delta */}
+                {ptqaResult.before_results && ptqaResult.after_results && (
+                  <div
+                    style={{
+                      padding: '12px',
+                      borderRadius: '8px',
+                      background: 'rgba(255,255,255,0.03)',
+                      border: '1px solid rgba(255,255,255,0.06)',
+                    }}
+                  >
+                    <div style={{ fontSize: '12px', color: 'var(--muted)', marginBottom: '6px' }}>
+                      Latency Delta
+                    </div>
+                    <div style={{ fontWeight: 700 }}>
+                      {(() => {
+                        const beforeLatency = ptqaResult.before_results.avg_exec_time || 0
+                        const afterLatency = ptqaResult.after_results.avg_exec_time || 0
+                        const delta = afterLatency - beforeLatency
+                        const color = delta < 0 ? '#4ade80' : delta > 0 ? '#f87171' : '#94a3b8'
+                        const sign = delta > 0 ? '+' : ''
+                        return (
+                          <span style={{ color }}>
+                            {sign}
+                            {delta.toFixed(2)}s
+                          </span>
+                        )
+                      })()}
+                    </div>
+                  </div>
+                )}
+
+                {/* Healing Effect */}
+                {typeof ptqaResult.healing_accuracy === 'number' && (
+                  <div
+                    style={{
+                      padding: '12px',
+                      borderRadius: '8px',
+                      background: 'rgba(255,255,255,0.03)',
+                      border: '1px solid rgba(255,255,255,0.06)',
+                    }}
+                  >
+                    <div style={{ fontSize: '12px', color: 'var(--muted)', marginBottom: '6px' }}>
+                      Healing Effect
+                    </div>
+                    <div style={{ fontWeight: 700 }}>
+                      {(ptqaResult.healing_accuracy * 100).toFixed(1)}%
+                    </div>
+                  </div>
+                )}
+
+                {/* Has Regression */}
+                <div
+                  style={{
+                    padding: '12px',
+                    borderRadius: '8px',
+                    background: 'rgba(255,255,255,0.03)',
+                    border: '1px solid rgba(255,255,255,0.06)',
+                  }}
+                >
+                  <div style={{ fontSize: '12px', color: 'var(--muted)', marginBottom: '6px' }}>
+                    Has Regression
+                  </div>
+                  <div style={{ fontWeight: 700 }}>
+                    {(() => {
+                      if (!ptqaResult.before_results || !ptqaResult.after_results) return '-'
+                      const beforeTotal = ptqaResult.before_results.total_tests || 0
+                      const beforePassed = ptqaResult.before_results.passed_tests || 0
+                      const afterTotal = ptqaResult.after_results.total_tests || 0
+                      const afterPassed = ptqaResult.after_results.passed_tests || 0
+                      const beforeRate = beforeTotal > 0 ? (beforePassed / beforeTotal) * 100 : 0
+                      const afterRate = afterTotal > 0 ? (afterPassed / afterTotal) * 100 : 0
+                      const hasRegression = afterRate < beforeRate
+                      return (
+                        <span style={{ color: hasRegression ? '#f87171' : '#4ade80' }}>
+                          {hasRegression ? 'Yes' : 'No'}
+                        </span>
+                      )
+                    })()}
+                  </div>
+                </div>
+              </div>
+
               <div style={{ marginTop: '12px' }}>
-                <strong>PTQA Output</strong>
+                <strong>PTQA Raw Output</strong>
               </div>
               <pre
                 style={{
