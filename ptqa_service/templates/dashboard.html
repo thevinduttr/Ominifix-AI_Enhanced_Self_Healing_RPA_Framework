@@ -4,50 +4,99 @@
     <meta charset="utf-8" />
     <title>PTQA Dashboard</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+      :root {
+        --bg: #0f1724;
+        --card: #0b1220;
+        --muted: #94a3b8;
+        --accent: #60a5fa;
+        --success: #10b981;
+        --danger: #ef4444;
+        --table-border: rgba(255, 255, 255, 0.06);
+      }
+      
+      body {
+        background: linear-gradient(180deg, #071021 0%, #071724 100%) !important;
+        color: #e6eef8 !important;
+      }
+      
+      .dark-card {
+        background-color: var(--card) !important;
+        border: 1px solid var(--table-border) !important;
+        color: #e6eef8 !important;
+      }
+      
+      .dark-text {
+        color: #e6eef8 !important;
+      }
+      
+      .dark-muted {
+        color: var(--muted) !important;
+      }
+      
+      .dark-input {
+        background-color: #0a0e18 !important;
+        border: 1px solid var(--table-border) !important;
+        color: #e6eef8 !important;
+      }
+      
+      .dark-input::placeholder {
+        color: var(--muted) !important;
+      }
+      
+      .dark-button {
+        background-color: var(--accent) !important;
+        color: white !important;
+      }
+      
+      .dark-button:hover {
+        background-color: #3b82f6 !important;
+      }
+    </style>
   </head>
 
-  <body class="bg-slate-50">
+  <body>
     <div class="max-w-7xl mx-auto p-6">
       <div class="flex items-center justify-between">
         <div>
-          <h1 class="text-3xl font-bold">PTQA Dashboard</h1>
-          <p class="text-slate-600 mt-1">
+          <h1 class="text-3xl font-bold dark-text">PTQA Dashboard</h1>
+          <p class="dark-muted mt-1">
             Predictive Testing and Quality Assessment console with Before vs
             After validation.
           </p>
         </div>
-        <div class="text-sm text-slate-500">
-          <a class="underline" href="/docs">API Docs</a>
+        <div class="text-sm dark-muted">
+          <a class="underline hover:text-white" href="/docs">API Docs</a>
         </div>
       </div>
 
       <div class="grid grid-cols-12 gap-6 mt-6">
         <!-- Left: Input -->
-        <div class="col-span-6 bg-white rounded-xl shadow p-4">
+        <div class="col-span-6 dark-card rounded-xl shadow p-4">
           <div class="flex items-center justify-between">
-            <h2 class="text-lg font-semibold">Healing Payload</h2>
+            <h2 class="text-lg font-semibold dark-text">Healing Payload</h2>
 
             <div class="flex gap-2">
               <button
-                class="px-3 py-1 rounded bg-slate-200 hover:bg-slate-300 text-sm"
+                class="px-3 py-1 rounded bg-slate-700 hover:bg-slate-600 text-sm dark-text"
                 onclick="loadPreset('login')"
               >
                 Preset: Login
               </button>
               <button
-                class="px-3 py-1 rounded bg-slate-200 hover:bg-slate-300 text-sm"
+                class="px-3 py-1 rounded bg-slate-700 hover:bg-slate-600 text-sm dark-text"
                 onclick="loadPreset('addremove')"
               >
                 Preset: Add/Remove
               </button>
               <button
-                class="px-3 py-1 rounded bg-slate-200 hover:bg-slate-300 text-sm"
+                class="px-3 py-1 rounded bg-slate-700 hover:bg-slate-600 text-sm dark-text"
                 onclick="loadPreset('dynamic')"
               >
                 Preset: Dynamic
               </button>
               <button
-                class="px-3 py-1 rounded bg-slate-200 hover:bg-slate-300 text-sm"
+                class="px-3 py-1 rounded bg-slate-700 hover:bg-slate-600 text-sm dark-text"
                 onclick="loadPreset('orange')"
               >
                 Preset: OrangeHRM
@@ -56,24 +105,24 @@
           </div>
 
           <div class="mt-3">
-            <label class="text-sm text-slate-600">Payload JSON</label>
+            <label class="text-sm dark-muted">Payload JSON</label>
             <textarea
               id="payload"
-              class="w-full mt-1 h-80 font-mono text-sm border rounded p-2"
+              class="w-full mt-1 h-80 font-mono text-sm dark-input rounded p-2"
             ></textarea>
           </div>
 
           <div class="mt-3 flex items-center justify-between">
             <div class="flex items-center gap-2">
               <input id="headlessToggle" type="checkbox" checked />
-              <label for="headlessToggle" class="text-sm text-slate-700"
+              <label for="headlessToggle" class="text-sm dark-text"
                 >Headless mode</label
               >
             </div>
 
             <button
               onclick="evaluateHealing()"
-              class="px-4 py-2 rounded bg-blue-600 hover:bg-blue-700 text-white font-medium"
+              class="px-4 py-2 rounded dark-button font-medium"
             >
               Evaluate Healing
             </button>
@@ -81,81 +130,82 @@
 
           <div
             id="errorBox"
-            class="hidden mt-3 p-3 rounded bg-red-50 text-red-700 text-sm"
+            class="hidden mt-3 p-3 rounded bg-red-900 text-red-200 text-sm border border-red-700"
           ></div>
         </div>
 
         <!-- Right: Results -->
-        <div class="col-span-6 bg-white rounded-xl shadow p-4">
-          <h2 class="text-lg font-semibold">Result</h2>
+        <div class="col-span-6 dark-card rounded-xl shadow p-4">
+          <h2 class="text-lg font-semibold dark-text">Result</h2>
 
           <div class="mt-3 grid grid-cols-3 gap-3">
-            <div class="p-3 rounded bg-slate-100">
-              <div class="text-xs text-slate-500">Recommendation</div>
-              <div id="recommendation" class="text-base font-bold">-</div>
+            <div class="p-3 rounded" style="background-color: var(--card); border: 1px solid var(--table-border);">
+              <div class="text-xs dark-muted">Recommendation</div>
+              <div id="recommendation" class="text-base font-bold dark-text">-</div>
             </div>
-            <div class="p-3 rounded bg-slate-100">
-              <div class="text-xs text-slate-500">Risk Level</div>
-              <div id="riskLevel" class="text-base font-bold">-</div>
+            <div class="p-3 rounded" style="background-color: var(--card); border: 1px solid var(--table-border);">
+              <div class="text-xs dark-muted">Risk Level</div>
+              <div id="riskLevel" class="text-base font-bold dark-text">-</div>
             </div>
-            <div class="p-3 rounded bg-slate-100">
-              <div class="text-xs text-slate-500">Will Work Prob.</div>
-              <div id="willWork" class="text-base font-bold">-</div>
+            <div class="p-3 rounded" style="background-color: var(--card); border: 1px solid var(--table-border);">
+              <div class="text-xs dark-muted">Will Work Prob.</div>
+              <div id="willWork" class="text-base font-bold dark-text">-</div>
             </div>
           </div>
 
           <div class="mt-4">
-            <h3 class="font-semibold">Metrics (Before vs After)</h3>
+            <h3 class="font-semibold dark-text">Metrics (Before vs After)</h3>
             <div class="grid grid-cols-2 gap-3 mt-2 text-sm">
-              <div class="p-3 rounded border">
-                <div class="text-slate-500 text-xs">
+              <div class="p-3 rounded" style="background-color: var(--card); border: 1px solid var(--table-border);">
+                <div class="text-xs dark-muted">
                   Pass Rate (Before → After)
                 </div>
-                <div id="passRate" class="font-mono">-</div>
+                <div id="passRate" class="font-mono dark-text">-</div>
               </div>
-              <div class="p-3 rounded border">
-                <div class="text-slate-500 text-xs">
+              <div class="p-3 rounded" style="background-color: var(--card); border: 1px solid var(--table-border);">
+                <div class="text-xs dark-muted">
                   Avg Time (Before → After)
                 </div>
-                <div id="avgTime" class="font-mono">-</div>
+                <div id="avgTime" class="font-mono dark-text">-</div>
               </div>
-              <div class="p-3 rounded border">
-                <div class="text-slate-500 text-xs">Pass Rate Delta</div>
-                <div id="passDelta" class="font-mono">-</div>
+              <div class="p-3 rounded" style="background-color: var(--card); border: 1px solid var(--table-border);">
+                <div class="text-xs dark-muted">Pass Rate Delta</div>
+                <div id="passDelta" class="font-mono dark-text">-</div>
               </div>
-              <div class="p-3 rounded border">
-                <div class="text-slate-500 text-xs">Latency Delta</div>
-                <div id="latDelta" class="font-mono">-</div>
+              <div class="p-3 rounded" style="background-color: var(--card); border: 1px solid var(--table-border);">
+                <div class="text-xs dark-muted">Latency Delta</div>
+                <div id="latDelta" class="font-mono dark-text">-</div>
               </div>
             </div>
           </div>
 
           <div class="mt-4">
-            <h3 class="font-semibold">Raw Response</h3>
+            <h3 class="font-semibold dark-text">Raw Response</h3>
             <pre
               id="raw"
-              class="mt-2 bg-slate-900 text-slate-100 p-3 rounded text-xs overflow-auto h-56"
+              class="mt-2 p-3 rounded text-xs overflow-auto h-56 dark-input"
+              style="background-color: #0a0e18; color: #e6eef8;"
             ></pre>
           </div>
         </div>
       </div>
 
       <!-- History -->
-      <div class="bg-white rounded-xl shadow p-4 mt-6">
+      <div class="dark-card rounded-xl shadow p-4 mt-6">
         <div class="flex items-center justify-between">
-          <h2 class="text-lg font-semibold">Past Evaluations (SQLite)</h2>
+          <h2 class="text-lg font-semibold dark-text">Past Evaluations (SQLite)</h2>
 
           <div class="flex items-center gap-2">
             <button
               onclick="location.reload()"
-              class="px-3 py-1 rounded bg-slate-200 hover:bg-slate-300 text-sm"
+              class="px-3 py-1 rounded bg-slate-700 hover:bg-slate-600 text-sm dark-text"
             >
               Refresh
             </button>
 
             <button
               onclick="deleteAllRuns()"
-              class="px-3 py-1 rounded bg-red-100 hover:bg-red-200 text-sm text-red-700"
+              class="px-3 py-1 rounded bg-red-900 hover:bg-red-800 text-sm text-red-300"
             >
               Delete All
             </button>
@@ -163,9 +213,9 @@
         </div>
 
         <div class="overflow-auto mt-3">
-          <table class="w-full text-sm">
+          <table class="w-full text-sm dark-text">
             <thead>
-              <tr class="text-left text-slate-600 border-b">
+              <tr class="text-left dark-muted border-b" style="border-color: var(--table-border);">
                 <th class="py-2">Healing ID</th>
                 <th>Script</th>
                 <th>Env</th>
@@ -179,7 +229,7 @@
             </thead>
             <tbody>
               {% for r in runs %}
-              <tr class="border-b">
+              <tr class="border-b" style="border-color: var(--table-border);">
                 <td class="py-2 font-mono">{{ r.healing_id }}</td>
                 <td>{{ r.script_id }}</td>
                 <td>{{ r.environment }}</td>
@@ -196,14 +246,14 @@
                 </td>
                 <td class="text-right">
                   <a
-                    class="underline"
+                    class="underline hover:text-blue-400"
                     href="/dashboard/report/{{ r.healing_id }}"
                     >View</a
                   >
                 </td>
                 <td class="text-right">
                   <button
-                    class="underline text-red-600"
+                    class="underline text-red-400 hover:text-red-300"
                     onclick="deleteRun('{{ r.healing_id }}')"
                   >
                     Delete

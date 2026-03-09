@@ -29,7 +29,7 @@ def run_playwright_flow(
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=headless)
 
-        context_args = {}
+        context_args = {"ignore_https_errors": True}
         if record_video:
             context_args["record_video_dir"] = str(videos_dir)
             context_args["record_video_size"] = {"width": 1280, "height": 720}
