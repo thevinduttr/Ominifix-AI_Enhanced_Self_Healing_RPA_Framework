@@ -1,0 +1,50 @@
+{
+  "metadata": {
+    "healing_id": "HEAL-9e97886f-3a5a-4079-83d3-9b2fe82eb661",
+    "report_id": "ELR-2269dd80-108e-439d-bb6e-789605d5fe9e",
+    "run_id": "RUN-e9d2322f-8c65-4071-b13e-1d57c1513c6c",
+    "bot_id": "sliit_pdp_rpa_bot",
+    "timestamp": "2026-03-10T05:17:02.386357",
+    "source_component": "code_healing_engine",
+    "target_component": "code_healing_engine"
+  },
+  "failure_context": {
+    "script_path": "data/scripts/broken/auto_generated.py",
+    "failing_line": 1,
+    "action": "click_tab",
+    "old_locator": "ul.nav.hr-tabs-nav[role='tablist'] li.hr-tabs-nav-item a[role='tab']",
+    "error_type": "TIMEOUT_ERROR",
+    "error_message": "Page.goto: Target page, context or browser has been closed\nCall log:\n  - navigating to \"https://www.sliit.lk/\", waiting until \"domcontentloaded\"\n"
+  },
+  "dom_context": {
+    "page_url": "https://www.sliit.lk/",
+    "page_name": "",
+    "new_element_html": ""
+  },
+  "element_expectation": {
+    "expected_role": "tab_navigation",
+    "expected_text": "Online Programs"
+  },
+  "element_candidate": null,
+  "healing_summary": {
+    "status": "NO_FIX",
+    "strategy_used": "NO_FIX",
+    "action": "click_tab",
+    "old_locator": "ul.nav.hr-tabs-nav[role='tablist'] li.hr-tabs-nav-item a[role='tab']",
+    "new_locator": "",
+    "confidence": 0.0,
+    "patcher": "N/A",
+    "validation": {
+      "valid": true,
+      "reason": "Original script not found. input script_path='data/scripts/broken/auto_generated.py'. resolved='data/scripts/broken/auto_generated.py'. Set env var RPA_ROOT to RPA repo root."
+    }
+  },
+  "script_output": {
+    "original_script_path": "data/scripts/broken/auto_generated.py",
+    "healed_script_path": ""
+  },
+  "model_info": {
+    "model": "strategy_selector_v1",
+    "confidence": 0.6733856338799166
+  }
+}

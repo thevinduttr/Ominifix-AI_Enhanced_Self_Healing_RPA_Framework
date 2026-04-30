@@ -1,0 +1,56 @@
+{
+  "metadata": {
+    "healing_id": "HEAL-603967af-9337-44c9-a35a-099af03b9d18",
+    "report_id": "ELR-85d9d352-9026-4d70-8840-973b0fc26a5a",
+    "run_id": "RUN-PP1-BUTTON-TO-A",
+    "bot_id": "RPA-0020",
+    "timestamp": "2026-03-10T03:55:48.539200",
+    "source_component": "code_healing_engine",
+    "target_component": "code_healing_engine"
+  },
+  "failure_context": {
+    "script_path": "data/scripts/broken/auto_generated.py",
+    "failing_line": 1,
+    "action": "click",
+    "old_locator": "//button[@id='view_details']",
+    "error_type": "ElementNotFound",
+    "error_message": "No node found for selector"
+  },
+  "dom_context": {
+    "page_url": "https://dummy.local/details",
+    "page_name": "",
+    "new_element_html": "<div class=\"card\"><a id=\"view_details_link\" class=\"btn primary\">View details</a></div>"
+  },
+  "element_expectation": {
+    "expected_role": "primary_action",
+    "expected_text": "View details"
+  },
+  "element_candidate": {
+    "css": "div.card",
+    "xpath": "/html/body/div",
+    "full_xpath": "/html/body/div",
+    "score": 100.0,
+    "strategy": "attribute_text_similarity"
+  },
+  "healing_summary": {
+    "status": "NO_FIX",
+    "strategy_used": "NO_FIX",
+    "action": "click",
+    "old_locator": "//button[@id='view_details']",
+    "new_locator": "",
+    "confidence": 0.0,
+    "patcher": "N/A",
+    "validation": {
+      "valid": true,
+      "reason": "Original script not found. input script_path='data/scripts/broken/auto_generated.py'. resolved='data/scripts/broken/auto_generated.py'. Set env var RPA_ROOT to RPA repo root."
+    }
+  },
+  "script_output": {
+    "original_script_path": "data/scripts/broken/auto_generated.py",
+    "healed_script_path": ""
+  },
+  "model_info": {
+    "model": "strategy_selector_v1",
+    "confidence": 0.7892354280494898
+  }
+}

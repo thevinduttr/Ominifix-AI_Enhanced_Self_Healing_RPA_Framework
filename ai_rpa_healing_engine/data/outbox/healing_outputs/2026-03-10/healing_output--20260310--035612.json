@@ -1,0 +1,61 @@
+{
+  "metadata": {
+    "healing_id": "HEAL-b267f8b9-82f4-47e9-8b42-2f083ced14d8",
+    "report_id": "ELR-ed88b818-3bf3-44f3-8c40-9d4224fdfdc0",
+    "run_id": "RUN-PP1-BUTTON-TO-A",
+    "bot_id": "",
+    "timestamp": "2026-03-10T03:56:12.185193",
+    "source_component": "code_healing_engine",
+    "target_component": "code_healing_engine"
+  },
+  "failure_context": {
+    "script_path": "",
+    "failing_line": 1,
+    "action": "click",
+    "old_locator": "//button[@id='view_details']",
+    "error_type": "ElementNotFound",
+    "error_message": "No node found for selector"
+  },
+  "dom_context": {
+    "page_url": "https://dummy.local/details",
+    "page_name": "",
+    "new_element_html": "<div class=\"card\"><a id=\"view_details_link\" class=\"btn primary\">View details</a></div>"
+  },
+  "element_expectation": {
+    "expected_role": "primary_action",
+    "expected_text": "View details"
+  },
+  "element_candidate": {
+    "css": "div.card",
+    "xpath": "/html/body/div",
+    "full_xpath": "/html/body/div",
+    "score": 1.0,
+    "strategy": "attribute_text_similarity",
+    "extra": {
+      "text_similarity": 1.0,
+      "id_similarity": 0.0,
+      "name_similarity": 0.0
+    }
+  },
+  "healing_summary": {
+    "status": "NO_FIX",
+    "strategy_used": "NO_FIX",
+    "action": "click",
+    "old_locator": "//button[@id='view_details']",
+    "new_locator": "",
+    "confidence": 0.0,
+    "patcher": "N/A",
+    "validation": {
+      "valid": true,
+      "reason": "Error type 'ELEMENTNOTFOUND' not healable by locator patching."
+    }
+  },
+  "script_output": {
+    "original_script_path": "/app",
+    "healed_script_path": ""
+  },
+  "model_info": {
+    "model": "strategy_selector_v1",
+    "confidence": 0.7892354280494898
+  }
+}

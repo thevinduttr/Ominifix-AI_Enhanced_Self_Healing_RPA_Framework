@@ -1,0 +1,50 @@
+{
+  "metadata": {
+    "healing_id": "HEAL-b2aaa3dd-7549-4dde-9cf1-fa9a2508fac9",
+    "report_id": "DIRECT-1773114075",
+    "run_id": "RUN-AUTH-0232",
+    "bot_id": "BOT-AUTH-ERROR-001",
+    "timestamp": "2026-03-10T03:41:15.531274",
+    "source_component": "code_healing_engine",
+    "target_component": "code_healing_engine"
+  },
+  "failure_context": {
+    "script_path": "data/scripts/broken/auto_generated.py",
+    "failing_line": 1,
+    "action": "authenticate_user",
+    "old_locator": "//button[@id='login']",
+    "error_type": "AUTHENTICATION_ERROR",
+    "error_message": "AUTHENTICATION_ERROR: access token expired while calling protected API"
+  },
+  "dom_context": {
+    "page_url": "https://dummy.local/login",
+    "page_name": "",
+    "new_element_html": "<form id='login_form'><input id='username' name='username' /><input id='password' name='password' type='password' /><button id='sign_in_btn' class='btn primary'>Sign in</button></form>"
+  },
+  "element_expectation": {
+    "expected_role": "login_action",
+    "expected_text": "Sign in"
+  },
+  "element_candidate": null,
+  "healing_summary": {
+    "status": "NO_FIX",
+    "strategy_used": "NO_FIX",
+    "action": "authenticate_user",
+    "old_locator": "//button[@id='login']",
+    "new_locator": "",
+    "confidence": 0.0,
+    "patcher": "N/A",
+    "validation": {
+      "valid": true,
+      "reason": "Original script not found. input script_path='data/scripts/broken/auto_generated.py'. resolved='data/scripts/broken/auto_generated.py'. Set env var RPA_ROOT to RPA repo root."
+    }
+  },
+  "script_output": {
+    "original_script_path": "data/scripts/broken/auto_generated.py",
+    "healed_script_path": ""
+  },
+  "model_info": {
+    "model": "strategy_selector_v1",
+    "confidence": 0.6395016497290394
+  }
+}

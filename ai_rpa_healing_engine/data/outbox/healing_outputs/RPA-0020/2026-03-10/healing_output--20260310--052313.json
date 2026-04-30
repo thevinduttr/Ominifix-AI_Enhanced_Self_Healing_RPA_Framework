@@ -1,0 +1,50 @@
+{
+  "metadata": {
+    "healing_id": "HEAL-997a0deb-88af-4843-9e8c-ecfaa68632ac",
+    "report_id": "ELR-38c9df83-8235-4b07-b600-1413734afd3b",
+    "run_id": "RUN-PP1-BUTTON-TO-A-20260310052313",
+    "bot_id": "RPA-0020",
+    "timestamp": "2026-03-10T05:23:13.503472",
+    "source_component": "code_healing_engine",
+    "target_component": "code_healing_engine"
+  },
+  "failure_context": {
+    "script_path": "distributed_self_healing_orchestrator/dummy_bot/rpa/form_filler_bot.py",
+    "failing_line": 231,
+    "action": "click",
+    "old_locator": "main .content-grid article.panel form.form-grid .button-row button[type='submit_not_exist']",
+    "error_type": "TimeoutError",
+    "error_message": "Page.goto: Timeout 30000ms exceeded.\nCall log:\n  - navigating to \"https://realwesiteforrpac.vercel.app/\", waiting until \"domcontentloaded\"\n"
+  },
+  "dom_context": {
+    "page_url": "about:blank",
+    "page_name": "",
+    "new_element_html": "<!doctype html><html><body><div class=\"card\"><a id=\"view_details_link\" class=\"btn primary\">View details</a></div></body></html>"
+  },
+  "element_expectation": {
+    "expected_role": "primary_action",
+    "expected_text": "Add Customer"
+  },
+  "element_candidate": null,
+  "healing_summary": {
+    "status": "NO_FIX",
+    "strategy_used": "NO_FIX",
+    "action": "click",
+    "old_locator": "main .content-grid article.panel form.form-grid .button-row button[type='submit_not_exist']",
+    "new_locator": "",
+    "confidence": 0.0,
+    "patcher": "N/A",
+    "validation": {
+      "valid": true,
+      "reason": "Error type 'TIMEOUTERROR' not healable by locator patching."
+    }
+  },
+  "script_output": {
+    "original_script_path": "/workspace/distributed_self_healing_orchestrator/dummy_bot/rpa/form_filler_bot.py",
+    "healed_script_path": ""
+  },
+  "model_info": {
+    "model": "strategy_selector_v1",
+    "confidence": 0.6458070451879689
+  }
+}

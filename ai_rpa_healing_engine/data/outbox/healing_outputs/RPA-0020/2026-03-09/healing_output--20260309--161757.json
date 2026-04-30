@@ -1,0 +1,50 @@
+{
+  "metadata": {
+    "healing_id": "HEAL-e7e15528-9b8a-4ddb-bdf6-4f6a0e0c95b4",
+    "report_id": "ELR-e11d0f50-083c-4677-9813-f2b670b9194d",
+    "run_id": "RUN-PP1-BUTTON-TO-A-20260309161651",
+    "bot_id": "RPA-0020",
+    "timestamp": "2026-03-09T16:17:57.658833",
+    "source_component": "code_healing_engine",
+    "target_component": "code_healing_engine"
+  },
+  "failure_context": {
+    "script_path": "distributed_self_healing_orchestrator/dummy_bot/rpa/form_filler_bot.py",
+    "failing_line": 231,
+    "action": "click",
+    "old_locator": "main .content-grid article.panel form.form-grid .button-row button[type='submit_not_exist']",
+    "error_type": "TIMEOUT_ERROR",
+    "error_message": "Page.fill: Target crashed \nCall log:\n  - waiting for locator(\"main .content-grid article.panel form.form-grid input[name='branch']\")\n"
+  },
+  "dom_context": {
+    "page_url": "https://realwesiteforrpac.vercel.app/",
+    "page_name": "",
+    "new_element_html": "<!doctype html><html><body><div class=\"card\"><a id=\"view_details_link\" class=\"btn primary\">View details</a></div></body></html>"
+  },
+  "element_expectation": {
+    "expected_role": "primary_action",
+    "expected_text": "Add Customer"
+  },
+  "element_candidate": null,
+  "healing_summary": {
+    "status": "NO_FIX",
+    "strategy_used": "NO_FIX",
+    "action": "click",
+    "old_locator": "main .content-grid article.panel form.form-grid .button-row button[type='submit_not_exist']",
+    "new_locator": "",
+    "confidence": 0.6458070451879689,
+    "patcher": "N/A",
+    "validation": {
+      "valid": true,
+      "reason": "Conservative mode: ML confidence 0.6458 < 0.70. Best candidate '//html' is not ID-based and score 0.4000 < 0.90. Rejecting to prevent incorrect healing."
+    }
+  },
+  "script_output": {
+    "original_script_path": "/workspace/distributed_self_healing_orchestrator/dummy_bot/rpa/form_filler_bot.py",
+    "healed_script_path": ""
+  },
+  "model_info": {
+    "model": "strategy_selector_v1",
+    "confidence": 0.6458070451879689
+  }
+}

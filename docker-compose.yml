@@ -255,21 +255,21 @@ services:
     profiles:
       - vnc
 
-  # sliit_pdp_rpa_bot:
-  #   build:
-  #     context: ./sliit_pdp_rpa
-  #     dockerfile: Dockerfile
-  #   environment:
-  #     - PYTHONUNBUFFERED=1
-  #     - ORCHESTRATOR_URL=http://orchestrator_monitor:8000
-  #     - ORCHESTRATOR_ENABLED=true
-  #   volumes:
-  #     - ./sliit_pdp_rpa/outputs:/app/sliit_pdp_rpa/outputs
-  #     - ./sliit_pdp_rpa/logs:/app/sliit_pdp_rpa/logs
-  #   depends_on:
-  #     - orchestrator_monitor
-  #     - ai_element_locator
-  #   restart: "no"
+  sliit_pdp_rpa_bot:
+    build:
+      context: ./sliit_pdp_rpa
+      dockerfile: Dockerfile
+    environment:
+      - PYTHONUNBUFFERED=1
+      - ORCHESTRATOR_URL=http://orchestrator_monitor:8000
+      - ORCHESTRATOR_ENABLED=true
+    volumes:
+      - ./sliit_pdp_rpa/outputs:/app/sliit_pdp_rpa/outputs
+      - ./sliit_pdp_rpa/logs:/app/sliit_pdp_rpa/logs
+    depends_on:
+      - orchestrator_monitor
+      - ai_element_locator
+    restart: "no"
 
   sliit_pdp_rpa_element_not_found_bot:
     build:

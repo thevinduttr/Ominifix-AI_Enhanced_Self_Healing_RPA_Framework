@@ -1,0 +1,50 @@
+{
+  "metadata": {
+    "healing_id": "HEAL-1594c009-5cd3-4a92-a1f1-a608ac449736",
+    "report_id": "ELR-206dc2e8-b591-4b61-9eed-410f3fd1b0c8",
+    "run_id": "RUN-PP1-BUTTON-TO-A-20260309165319",
+    "bot_id": "RPA-0020",
+    "timestamp": "2026-03-09T16:53:57.713483",
+    "source_component": "code_healing_engine",
+    "target_component": "code_healing_engine"
+  },
+  "failure_context": {
+    "script_path": "distributed_self_healing_orchestrator/dummy_bot/rpa/form_filler_bot.py",
+    "failing_line": 236,
+    "action": "fill",
+    "old_locator": "main .content-grid article.panel form.form-grid input[name='email_not_exist']",
+    "error_type": "TIMEOUT_ERROR",
+    "error_message": "Page.fill: Timeout 30000ms exceeded.\nCall log:\n  - waiting for locator(\"main .content-grid article.panel form.form-grid input[name='email_not_exist']\")\n"
+  },
+  "dom_context": {
+    "page_url": "https://realwesiteforrpac.vercel.app/",
+    "page_name": "",
+    "new_element_html": "<!DOCTYPE html><html lang=\"en\"><head>\n    <meta charset=\"UTF-8\">\n    <link rel=\"icon\" type=\"image/svg+xml\" href=\"/vite.svg\">\n    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n    <title>real_rp_site</title>\n    <script type=\"module\" crossorigin=\"\" src=\"/assets/index-SVGFpHQK.js\"></script>\n    <link rel=\"stylesheet\" crossorigin=\"\" href=\"/assets/index-BPsD6AM8.css\">\n  </head>\n  <body>\n    <div id=\"root\"><main class=\"page\"><header class=\"topbar\"><div><p class=\"eyebrow\">Secure Internal Portal</p><h1>Regional Bank Customer System</h1></div><div class=\"badge\">Live Records: 2</div></header><section class=\"stats-grid\" aria-label=\"Summary statistics\"><article class=\"stat-card\"><h2>Total Balance</h2><p>LKR&nbsp;1,430,000</p></article><article class=\"stat-card\"><h2>KYC Verified</h2><p>1 / 2</p></article><article class=\"stat-card\"><h2>Account Types</h2><p>Saving &amp; Current</p></article></section><section class=\"content-grid\"><article class=\"panel\" aria-labelledby=\"customer-form-title\"><h2 id=\"customer-form-title\">Customer Data Entry</h2><form class=\"form-grid\"><label for=\"fullName\">Customer Name</label><input id=\"fullName\" placeholder=\"Ex: A. B. Silva\" type=\"text\" value=\"Ruwan Jayasinghe\" name=\"fullName\"><label for=\"accountNumber\">Account Number</label><input id=\"accountNumber\" placeholder=\"10-14 digit account number\" type=\"text\" value=\"300778899112\" name=\"accountNumber\"><label for=\"accountType\">Account Type</label><select id=\"accountType\" name=\"accountType\"><option value=\"Savings\">Savings</option><option value=\"Current\">Current</option></select><label for=\"branch\">Branch</label><input id=\"branch\" placeholder=\"Ex: Galle Branch\" type=\"text\" value=\"Galle Branch\" name=\"branch\"><label for=\"phone\">Phone</label><input id=\"phone\" placeholder=\"10 digit mobile\" type=\"text\" value=\"0764455667\" name=\"phone\"><label for=\"email\">Email</label><input id=\"email\" placeholder=\"name@bankmail.com\" type=\"email\" value=\"\" name=\"email\"><label for=\"balance\">Balance (LKR)</label><input id=\"balance\" placeholder=\"0\" min=\"0\" type=\"number\" value=\"\" name=\"balance\"><label class=\"checkbox-row\" for=\"kycVerified\"><input id=\"kycVerified\" type=\"checkbox\" name=\"kycVerified\">KYC verification completed</label><div class=\"button-row\"><button type=\"submit\">Add Customer</button><button type=\"button\" class=\"secondary\">Clear</button></div></form></article><article class=\"panel\" aria-labelledby=\"customer-list-title\"><div class=\"panel-head\"><h2 id=\"customer-list-title\">Customer Records</h2><input class=\"search\" placeholder=\"Search by name, account, branch\" aria-label=\"Search customers\" type=\"search\" value=\"\"></div><div class=\"table-wrap\"><table><thead><tr><th>Name</th><th>Account</th><th>Type</th><th>Branch</th><th>Balance</th><th>KYC</th><th>Actions</th></tr></thead><tbody><tr><td>Nimal Perera</td><td>100345678901</td><td>Savings</td><td>Colombo Main</td><td>LKR&nbsp;245,000</td><td>Verified</td><td class=\"actions\"><button type=\"button\" class=\"small\">Edit</button><button type=\"button\" class=\"small danger\">Delete</button></td></tr><tr><td>Kavindi Fernando</td><td>200567890123</td><td>Current</td><td>Kandy City</td><td>LKR&nbsp;1,185,000</td><td>Pending</td><td class=\"actions\"><button type=\"button\" class=\"small\">Edit</button><button type=\"button\" class=\"small danger\">Delete</button></td></tr></tbody></table></div></article></section></main></div>\n  \n\n</body></html>"
+  },
+  "element_expectation": {
+    "expected_role": "input_field",
+    "expected_text": "ruwan.jayasinghe@example.com"
+  },
+  "element_candidate": null,
+  "healing_summary": {
+    "status": "NO_FIX",
+    "strategy_used": "NO_FIX",
+    "action": "fill",
+    "old_locator": "main .content-grid article.panel form.form-grid input[name='email_not_exist']",
+    "new_locator": "",
+    "confidence": 0.4751090432083957,
+    "patcher": "N/A",
+    "validation": {
+      "valid": true,
+      "reason": "ML confidence 0.4751 < 0.50. Threshold too low for safe healing. Predicted strategy: LOCATOR_REGEN_LIBCST"
+    }
+  },
+  "script_output": {
+    "original_script_path": "/workspace/distributed_self_healing_orchestrator/dummy_bot/rpa/form_filler_bot.py",
+    "healed_script_path": ""
+  },
+  "model_info": {
+    "model": "strategy_selector_v1",
+    "confidence": 0.4751090432083957
+  }
+}
