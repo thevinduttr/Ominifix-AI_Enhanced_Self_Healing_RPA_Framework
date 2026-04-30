@@ -1,0 +1,50 @@
+name: Deploy Ominifix
+
+on:
+  push:
+    branches:
+      - deployment_1
+  workflow_dispatch:
+
+concurrency:
+  group: ominifix-vm-deploy
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Validate Docker Compose
+        env:
+          RABBITMQ_DEFAULT_PASS: ci-placeholder-password
+        run: docker compose config
+
+  deploy:
+    runs-on: ubuntu-latest
+    needs: validate
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Deploy on VM
+        uses: appleboy/ssh-action@v1.0.3
+        env:
+          VM_PROJECT_PATH: ${{ secrets.VM_PROJECT_PATH }}
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_KEY }}
+          envs: VM_PROJECT_PATH
+          script_stop: true
+          script: |
+            PROJECT_PATH="${VM_PROJECT_PATH:-/opt/Ominifix-AI_Enhanced_Self_Healing_RPA_Framework}"
+            cd "$PROJECT_PATH"
+            git pull origin deployment_1
+            docker volume create ominifix_rabbitmq_data || true
+            docker compose up -d --build --remove-orphans
+            docker compose ps
