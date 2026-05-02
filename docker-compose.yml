@@ -5,8 +5,8 @@ services:
       - "5672:5672"    # AMQP
       - "15672:15672"  # Management UI
     environment:
-      RABBITMQ_DEFAULT_USER: guest
-      RABBITMQ_DEFAULT_PASS: guest
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_DEFAULT_USER:-ominifix}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_DEFAULT_PASS:?Set RABBITMQ_DEFAULT_PASS in .env before starting the stack}
     volumes:
       - rabbitmq_data:/var/lib/rabbitmq
     healthcheck:
@@ -35,7 +35,9 @@ services:
       - "8000:8000"
     environment:
       MODEL_URL: https://rpa-error-classifier-555972249634.us-central1.run.app/predict
-      RABBIT_HOST: rabbitmq
+      RABBIT_HOST: ${RABBITMQ_HOST:-rabbitmq}
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_DEFAULT_USER:-ominifix}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_DEFAULT_PASS:?Set RABBITMQ_DEFAULT_PASS in .env before starting the stack}
       PTQA_SERVICE_URL: http://ptqa_service:8000/ptqa/evaluate-healing
       PTQA_READ_TIMEOUT_SECONDS: 30
       PTQA_RESTART_DELAY_SECONDS: 5
@@ -77,7 +79,9 @@ services:
       dockerfile: orchestrator-coordinator/Dockerfile
     command: ["python","consumer.py"]
     environment:
-      RABBIT_HOST: rabbitmq
+      RABBIT_HOST: ${RABBITMQ_HOST:-rabbitmq}
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_DEFAULT_USER:-ominifix}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_DEFAULT_PASS:?Set RABBITMQ_DEFAULT_PASS in .env before starting the stack}
     depends_on:
       rabbitmq:
         condition: service_healthy

@@ -13,8 +13,13 @@ def callback(ch, method, properties, body):
 
 
 def start_consumer():
-    rabbit_host = os.environ.get('RABBIT_HOST', 'rabbitmq')
-    connection = pika.BlockingConnection(pika.ConnectionParameters(rabbit_host))
+    rabbit_host = os.environ.get("RABBIT_HOST", "rabbitmq")
+    rabbit_user = os.environ.get("RABBITMQ_DEFAULT_USER", "guest")
+    rabbit_password = os.environ.get("RABBITMQ_DEFAULT_PASS", "guest")
+    credentials = pika.PlainCredentials(rabbit_user, rabbit_password)
+    connection = pika.BlockingConnection(
+        pika.ConnectionParameters(rabbit_host, credentials=credentials)
+    )
     channel = connection.channel()
     channel.queue_declare(queue="bot.failure")
 
