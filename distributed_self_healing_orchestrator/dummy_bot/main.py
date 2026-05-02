@@ -5,7 +5,7 @@ from datetime import datetime, UTC
 import requests
 from playwright.sync_api import sync_playwright, TimeoutError as PlaywrightTimeoutError
 
-url = "http://localhost:5174"
+url = "https://bank-system-for-rp-system.vercel.app/"
 BOT_ID = "DUMMY-BOT-new"
 ORCHESTRATOR_URL = os.getenv("ORCHESTRATOR_URL", "http://localhost:8000")
 HEARTBEAT_INTERVAL_SECONDS = 5
