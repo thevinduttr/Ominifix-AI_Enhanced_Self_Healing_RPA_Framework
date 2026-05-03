@@ -40,8 +40,7 @@ def send_failure_report(page, exc: Exception) -> None:
     try:
         page_url = page.url if page else "unknown"
         page_html = page.content() if page else ""
-        
-        # Capture screenshot
+
         screenshot_path = ""
         try:
             os.makedirs("rpa", exist_ok=True)
@@ -50,11 +49,11 @@ def send_failure_report(page, exc: Exception) -> None:
             page.screenshot(path=screenshot_path, full_page=True)
         except Exception:
             pass
-        
+
         failure_type = "ElementNotFound"
         if isinstance(exc, PlaywrightTimeoutError):
             failure_type = "TimeoutError"
-        
+
         payload = {
             "botId": BOT_ID,
             "page_url": page_url,
@@ -73,7 +72,7 @@ def send_failure_report(page, exc: Exception) -> None:
                 "run_id": f"RUN-DUMMY-{datetime.now(UTC).strftime('%Y%m%d%H%M%S')}",
             }
         }
-        
+
         response = requests.post(
             f"{ORCHESTRATOR_URL}/report_failure",
             json=payload,
@@ -93,53 +92,71 @@ def require_locator(page, selector: str):
 
 def run():
     """Main bot execution."""
+    global bot_running
+
     # Start heartbeat in background
-    heartbeat_thread = threading.Thread(target=send_heartbeat, daemon=True)
+    heartbeat_thread = threading.Thread(target=send_heartbeat)
     heartbeat_thread.start()
     print(f"🔄 Heartbeat thread started")
 
-    with sync_playwright() as p:
-        browser = p.chromium.launch(headless=False, slow_mo=800)
-        page = browser.new_page()
+    try:
+        with sync_playwright() as p:
+            browser = p.chromium.launch(headless=False, slow_mo=800)
+            page = browser.new_page()
 
-        page.goto(url)
-        page.wait_for_load_state("networkidle")
-
-        try:
-            page.locator("text=Settings").click()
+            page.goto(url)
             page.wait_for_load_state("networkidle")
-            # Use ID-only selectors for the Settings page fields
-            full_name = require_locator(page, "#full-name")
-            full_name.click()
-            full_name.type("John Doe", delay=100)
-            page.wait_for_timeout(250)
 
-            role = require_locator(page, "#role")
-            role.select_option(label="Risk Analyst")
+            try:
+                username_input = require_locator(page, "input[placeholder='admin']")
+                username_input.fill("admin")
 
-            work_email = require_locator(page, "#work-email")
-            work_email.click()
-            work_email.type("john.doe@company.com", delay=100)
-            page.wait_for_timeout(250)
+                password_input = require_locator(page, "input[placeholder='admin123']")
+                password_input.fill("admin123")
 
-            contact_number = require_locator(page, "#contact-number")
-            contact_number.click()
-            contact_number.type("+1234567890", delay=100)
-            page.wait_for_timeout(250)
+                login_button = require_locator(page, "button[type='submit']")
+                login_button.click()
 
-            # Submit button get by id
-            update_profile = require_locator(page, "#update-profile")
-            update_profile.click()
+                page.wait_for_load_state("networkidle")
 
-            page.wait_for_timeout(5000)
+                page.locator("text=Settings").click()
+                page.wait_for_load_state("networkidle")
 
-        except Exception as e:
-            global bot_running
-            bot_running = False  # Stop sending heartbeats
-            print(f"❌ Bot execution failed: {e}")
-            send_failure_report(page, e)
+                full_name = require_locator(page, "#full-name")
+                full_name.click()
+                full_name.type("John Doe", delay=100)
+                page.wait_for_timeout(250)
 
-       
+                role = require_locator(page, "#role")
+                role.select_option(label="Risk Analyst")
+
+                work_email = require_locator(page, "#work-email")
+                work_email.click()
+                work_email.type("john.doe@company.com", delay=100)
+                page.wait_for_timeout(250)
+
+                contact_number = require_locator(page, "#contact-number")
+                contact_number.click()
+                contact_number.type("+1234567890", delay=100)
+                page.wait_for_timeout(250)
+
+                update_profile = require_locator(page, "#update-sprofile")
+                update_profile.click()
+
+                page.wait_for_timeout(5000)
+
+            except Exception as e:
+                bot_running = False
+                print(f"❌ Bot execution failed: {e}")
+                send_failure_report(page, e)
+
+            while bot_running:
+                time.sleep(1)
+    except KeyboardInterrupt:
+        print("⛔ Bot stopped by Ctrl+C")
+    finally:
+        bot_running = False
+        heartbeat_thread.join()
 
 
 if __name__ == "__main__":
