@@ -7,6 +7,7 @@ BOT_ID = os.getenv("BOT_ID", "RPA-0020").strip() or "RPA-0020"
 USE_HEALED_SCRIPT = os.getenv("USE_HEALED_SCRIPT", "true").strip().lower() in {"1", "true", "yes"}
 HEALED_SCRIPTS_DIR = os.getenv("HEALED_SCRIPTS_DIR", "/app/healed_scripts").strip() or "/app/healed_scripts"
 ORIGINAL_SCRIPT = os.getenv("ORIGINAL_BOT_SCRIPT", "/app/rpa/form_filler_bot.py").strip() or "/app/rpa/form_filler_bot.py"
+FORCE_HEALED_SCRIPT_PATH = os.getenv("FORCE_HEALED_SCRIPT_PATH", "").strip()
 
 
 def resolve_runtime_path(path_str: str, *, for_healed_dir: bool = False) -> str:
@@ -98,6 +99,14 @@ def main() -> None:
     ORIGINAL_SCRIPT = resolve_runtime_path(ORIGINAL_SCRIPT)
 
     ensure_headless_in_no_display_env()
+
+    forced_healed_path = resolve_runtime_path(FORCE_HEALED_SCRIPT_PATH)
+    if forced_healed_path:
+        if os.path.exists(forced_healed_path):
+            print(f"[launcher] FORCE_HEALED_SCRIPT_PATH is set. Running: {forced_healed_path}")
+            run_script(forced_healed_path)
+            return
+        print(f"[launcher] Forced healed script not found: {forced_healed_path}. Falling back to normal selection.")
 
     if USE_HEALED_SCRIPT:
         healed_path = find_latest_healed_script()

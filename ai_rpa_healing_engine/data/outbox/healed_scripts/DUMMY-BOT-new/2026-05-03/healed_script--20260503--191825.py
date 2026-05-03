@@ -292,7 +292,7 @@ def fill_customer_onboarding_form(page, customer_data: dict) -> dict:
     assigned_branch.type(branch_value, delay=100)
     page.wait_for_timeout(200)
 
-    customer_terms = require_locator(page, "#customer-term")
+    customer_terms = require_locator(page, "#customer-terms")
     terms_checked = False
     if not customer_terms.is_checked():
         customer_terms.check()

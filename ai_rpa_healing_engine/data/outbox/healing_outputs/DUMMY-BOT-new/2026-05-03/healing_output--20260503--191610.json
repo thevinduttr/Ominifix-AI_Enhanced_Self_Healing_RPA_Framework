@@ -1,0 +1,50 @@
+{
+  "metadata": {
+    "healing_id": "HEAL-5ea376db-64c1-43a6-a385-69cffef994fe",
+    "report_id": "ELR-ea1c652a-fc2e-4521-9ec0-791f597beceb",
+    "run_id": "RUN-DUMMY-20260503191610",
+    "bot_id": "DUMMY-BOT-new",
+    "timestamp": "2026-05-03T19:16:10.911093",
+    "source_component": "code_healing_engine",
+    "target_component": "code_healing_engine"
+  },
+  "failure_context": {
+    "script_path": "/app/healed_scripts/DUMMY-BOT-new/2026-05-03/healed_script--20260503--191430.py",
+    "failing_line": 277,
+    "action": "locator",
+    "old_locator": "",
+    "error_type": "TIMEOUT_ERROR",
+    "error_message": "Locator.select_option: Timeout 30000ms exceeded.\nCall log:\n  - waiting for locator(\"#customer-segment\")\n    - locator resolved to <select id=\"customer-segment\">\u2026</select>\n  - attempting select option action\n    2 \u00d7 waiting for element to be visible and enabled\n      - did not find some options\n    - retrying select option action\n    - waiting 20ms\n    2 \u00d7 waiting for element to be visible and enabled\n      - did not find some options\n    - retrying select option action\n      - waiting 100ms\n    59 \u00d7 waiting for element to be visible and enabled\n       - did not find some options\n     - retrying select option action\n       - waiting 500ms\n    - waiting for element to be visible and enabled\n"
+  },
+  "dom_context": {
+    "page_url": "https://bank-system-for-rp-system.vercel.app/customers",
+    "page_name": "settings",
+    "new_element_html": "<!DOCTYPE html><html lang=\"en\"><head>\n    <meta charset=\"UTF-8\">\n    <link rel=\"icon\" type=\"image/svg+xml\" href=\"/favicon.svg\">\n    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n    <title>my-app</title>\n    <script type=\"module\" crossorigin=\"\" src=\"/assets/index-CWdDbO_k.js\"></script>\n    <link rel=\"stylesheet\" crossorigin=\"\" href=\"/assets/index-DkGuOUHH.css\">\n  </head>\n  <body>\n    <div id=\"root\"><div class=\"admin-shell\"><aside class=\"admin-sidebar\"><div class=\"brand-wrap\"><p class=\"brand-kicker\">Atlas National</p><h1 class=\"brand-title\">Bank Admin</h1></div><nav class=\"admin-nav\" aria-label=\"Bank admin sections\"><a class=\"nav-link\" href=\"/\" data-discover=\"true\">Dashboard</a><a class=\"nav-link active\" href=\"/customers\" data-discover=\"true\" aria-current=\"page\">Customers</a><a class=\"nav-link\" href=\"/transactions\" data-discover=\"true\">Transactions</a><a class=\"nav-link\" href=\"/loans\" data-discover=\"true\">Loans</a><a class=\"nav-link\" href=\"/risk\" data-discover=\"true\">Risk &amp; Compliance</a><a class=\"nav-link\" href=\"/branches\" data-discover=\"true\">Branches</a><a class=\"nav-link\" href=\"/settings\" data-discover=\"true\">Settings</a></nav><section class=\"security-card\"><p class=\"security-title\">Security Watch</p><p class=\"security-detail\">MFA compliance: 98.6%</p><p class=\"security-detail\">Open incidents: 3</p></section></aside><main class=\"admin-main\"><header class=\"topbar\"><input class=\"search-input\" placeholder=\"Search customer, account, branch, case...\" aria-label=\"Search\"><div class=\"topbar-actions\"><button type=\"button\" id=\"export-report\" class=\"topbar-btn\">Export Report</button><button type=\"button\" id=\"new-alert-rule\" class=\"topbar-btn strong\">New Alert Rule</button><button type=\"button\" id=\"logout\" class=\"topbar-btn danger\">Logout</button></div></header><section class=\"page-wrap\"><header class=\"page-header\"><div><p class=\"page-kicker\">CRM</p><h2>Customer Intelligence Center</h2></div></header><article class=\"panel\"><h3>High Value and Monitored Accounts</h3><div class=\"table-wrap\"><table><thead><tr><th>ID</th><th>Name</th><th>Segment</th><th>Risk Score</th><th>Status</th><th>Branch</th></tr></thead><tbody><tr><td>C-10932</td><td>Ariya Silva</td><td>Private</td><td>11</td><td><span class=\"status-pill active\">Active</span></td><td>Colombo Central</td></tr><tr><td>C-20815</td><td>Northline Textiles</td><td>SME</td><td>37</td><td><span class=\"status-pill review\">Review</span></td><td>Kandy Trade</td></tr><tr><td>C-67104</td><td>J. Fernando</td><td>Retail</td><td>22</td><td><span class=\"status-pill active\">Active</span></td><td>Galle Coast</td></tr><tr><td>C-90344</td><td>Velocity Freight Ltd</td><td>Corporate</td><td>45</td><td><span class=\"status-pill review\">Review</span></td><td>Colombo Corporate</td></tr><tr><td>C-35018</td><td>M. Perera</td><td>Retail</td><td>8</td><td><span class=\"status-pill dormant\">Dormant</span></td><td>Kurunegala Main</td></tr></tbody></table></div></article><section class=\"two-col-grid\"><article class=\"panel\"><h3>Customer Onboarding Form</h3><p class=\"panel-text\">Create and route a new customer profile for KYC screening.</p><form class=\"admin-form\"><div class=\"form-grid\"><label id=\"label-customer-fullname\" class=\"field\">Full Name<input id=\"customer-fullname\" placeholder=\"e.g. Nimal Jayasuriya\" type=\"text\" value=\"Priya Sharma\"></label><label id=\"label-customer-segment\" class=\"field\">Segment<select id=\"customer-segment\"><option>Retail</option><option>SME</option><option>Corporate</option><option>Private</option></select></label><label id=\"label-customer-id\" class=\"field\">National ID / Registration<input id=\"customer-id\" placeholder=\"NIC / Company Registration\" type=\"text\" value=\"\"></label><fieldset id=\"label-customer-gender\" class=\"field\"><legend>Gender</legend><label><input type=\"radio\" value=\"Male\" checked=\"\" name=\"customer-gender\">Male</label><label><input type=\"radio\" value=\"Female\" name=\"customer-gender\">Female</label><label><input type=\"radio\" value=\"Other\" name=\"customer-gender\">Other</label></fieldset><label id=\"label-assigned-branch\" class=\"field\">Assigned Branch<input id=\"assigned-branch\" placeholder=\"Colombo Central\" type=\"text\" value=\"\"></label></div><label id=\"label-customer-terms\" class=\"field\"><input id=\"customer-terms\" type=\"checkbox\">I confirm this onboarding profile has customer consent for processing.</label><label id=\"label-customer-notes\" class=\"field\">Notes<textarea id=\"customer-notes\" rows=\"4\" placeholder=\"Add due diligence notes or onboarding instructions\"></textarea></label><div class=\"form-actions\"><button type=\"button\" id=\"save-draft\" class=\"form-btn\">Save Draft</button><button type=\"submit\" id=\"submit-kyc\" class=\"form-btn strong\">Submit for KYC</button></div></form></article><article class=\"panel gradient-panel\"><h3>Retention Campaign Builder</h3><p class=\"panel-text\">Launch targeted engagement for dormant and review accounts.</p><form class=\"admin-form\"><div class=\"form-grid\"><label id=\"label-campaign-name\" class=\"field\">Campaign Name<input id=\"campaign-name\" placeholder=\"Q2 Dormant Reactivation\" type=\"text\"></label><label id=\"label-audience-segment\" class=\"field\">Audience Segment<select id=\"audience-segment\"><option selected=\"\">Dormant Retail</option><option>High-value Private</option><option>SME Review Queue</option></select></label><label id=\"label-offer-type\" class=\"field\">Offer Type<select id=\"offer-type\"><option selected=\"\">Fee Waiver</option><option>Bonus Interest</option><option>Credit Upgrade</option></select></label><label id=\"label-campaign-launch-date\" class=\"field\">Launch Date<input id=\"campaign-launch-date\" type=\"date\"></label></div><div class=\"form-actions\"><button type=\"button\" id=\"campaign-preview\" class=\"form-btn\">Preview</button><button type=\"submit\" id=\"start-campaign\" class=\"form-btn strong\">Start Campaign</button></div></form></article></section><article class=\"panel\"><h3>Onboarding Submissions</h3><p class=\"panel-text\">Recently added customer details from the onboarding form (2).</p><div class=\"table-wrap\"><table><thead><tr><th>Ref</th><th>Full Name</th><th>Segment</th><th>Gender</th><th>National ID / Registration</th><th>Branch</th><th>Notes</th><th>Consent</th><th>Stage</th><th>Submitted At</th></tr></thead><tbody><tr><td>ONB-1777835732611</td><td>Rajesh Kumar Singh</td><td>Corporate</td><td>Male</td><td>NIC-198756234901</td><td>Colombo North</td><td>Corporate account setup.</td><td>Accepted</td><td>KYC Pending</td><td>5/3/2026, 7:15:32 PM</td></tr><tr><td>ONB-1777835707632</td><td>Nimal Jayasuriya</td><td>Retail</td><td>Female</td><td>NIC-199012345678</td><td>Colombo Central</td><td>Customer onboarding added from demo bot.</td><td>Accepted</td><td>KYC Pending</td><td>5/3/2026, 7:15:07 PM</td></tr></tbody></table></div></article></section></main></div></div>\n  \n\n</body></html>"
+  },
+  "element_expectation": {
+    "expected_role": "form_field",
+    "expected_text": "Update Profile"
+  },
+  "element_candidate": null,
+  "healing_summary": {
+    "status": "NO_FIX",
+    "strategy_used": "NO_FIX",
+    "action": "locator",
+    "old_locator": "",
+    "new_locator": "",
+    "confidence": 0.0,
+    "patcher": "N/A",
+    "validation": {
+      "valid": true,
+      "reason": "Original script not found. input script_path='/app/healed_scripts/DUMMY-BOT-new/2026-05-03/healed_script--20260503--191430.py'. resolved='/app/healed_scripts/DUMMY-BOT-new/2026-05-03/healed_script--20260503--191430.py'. Set env var RPA_ROOT to RPA repo root."
+    }
+  },
+  "script_output": {
+    "original_script_path": "/app/healed_scripts/DUMMY-BOT-new/2026-05-03/healed_script--20260503--191430.py",
+    "healed_script_path": ""
+  },
+  "model_info": {
+    "model": "strategy_selector_v1",
+    "confidence": 0.45134683940552106
+  }
+}

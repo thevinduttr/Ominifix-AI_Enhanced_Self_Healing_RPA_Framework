@@ -182,6 +182,20 @@ services:
     depends_on:
       - orchestrator_monitor
 
+  bot_network_error:
+    build:
+      context: ./distributed_self_healing_orchestrator
+      dockerfile: dummy_bot/Dockerfile
+    command: ["python", "bot_network_error.py"]
+    environment:
+      - MONITOR_URL=http://orchestrator_monitor:8000/heartbeat
+      - BOT_ID=BOT-NETWORK-ERROR-001
+      - HEARTBEATS=4
+      - INTERVAL=3
+      - NETWORK_ERROR_MESSAGE=Connection timed out while calling upstream service
+    depends_on:
+      - orchestrator_monitor
+
   dummy_bot:
     build:
       context: ./distributed_self_healing_orchestrator
@@ -192,6 +206,9 @@ services:
       - MONITOR_URL=http://orchestrator_monitor:8000/heartbeat
       - BOT_ID=DUMMY-BOT-new
       - HEARTBEAT_INTERVAL=5
+      - AUTO_WAIT_FOR_HEALING=true
+      - HEALING_POLL_INTERVAL_SECONDS=3
+      - HEALING_WAIT_TIMEOUT_SECONDS=600
       - HEADLESS=true
       - KEEP_ALIVE_AFTER_SUCCESS=true
       - USE_HEALED_SCRIPT=true
@@ -290,13 +307,22 @@ services:
         "rm -f /tmp/.X99-lock /tmp/.X11-unix/X99; exec /app/start_bot_vnc.sh",
       ]
     environment:
+      - ORCHESTRATOR_URL=http://orchestrator_monitor:8000
       - MONITOR_URL=http://orchestrator_monitor:8000/heartbeat
       - BOT_ID=DUMMY-BOT-new
       - BOT_SERVICE_NAME=dummy_bot_vnc
       - HEARTBEAT_INTERVAL=3
+      - AUTO_WAIT_FOR_HEALING=true
+      - HEALING_POLL_INTERVAL_SECONDS=3
+      - HEALING_WAIT_TIMEOUT_SECONDS=600
       - HEADLESS=false
       - KEEP_ALIVE_AFTER_SUCCESS=true
-      - BOT_COMMAND=python main.py
+      - USE_HEALED_SCRIPT=true
+      - HEALED_SCRIPTS_DIR=/app/healed_scripts
+      - ORIGINAL_BOT_SCRIPT=/app/main.py
+      - BOT_COMMAND=python rpa/run_healed_or_original.py
+    volumes:
+      - ./ai_rpa_healing_engine/data/outbox/healed_scripts:/app/healed_scripts:ro
     ports:
       - "6081:6080"
     depends_on:
