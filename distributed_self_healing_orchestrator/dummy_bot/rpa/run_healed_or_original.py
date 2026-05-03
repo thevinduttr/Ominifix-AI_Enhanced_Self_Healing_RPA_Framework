@@ -81,6 +81,7 @@ def healed_script_supports_keepalive(path: str) -> bool:
     markers = [
         "KEEP_ALIVE_AFTER_SUCCESS",
         "Run succeeded. Entering idle heartbeat mode.",
+        "while bot_running:",
     ]
     return any(marker in text for marker in markers)
 

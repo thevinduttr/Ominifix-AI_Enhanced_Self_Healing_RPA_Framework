@@ -76,6 +76,32 @@ if __name__ == "__main__":
 '''
 
 
+LOCATOR_HELPER_SCRIPT = '''from playwright.sync_api import sync_playwright
+
+
+def require_locator(page, selector: str):
+    locator = page.locator(selector)
+    if locator.count() == 0:
+        raise Exception(f"Element not found: {selector}")
+    return locator
+
+
+def run():
+    with sync_playwright() as p:
+        browser = p.chromium.launch(headless=True)
+        page = browser.new_page()
+
+        update_profile = require_locator(page, "#update-pjkrofile")
+        update_profile.click()
+
+        browser.close()
+
+
+if __name__ == "__main__":
+    run()
+'''
+
+
 class TestSuccessfulPatch:
     def test_fill_action_patched(self, patcher, tmp_dir):
         script = _write_script(tmp_dir, "fill_test.py", FILL_SCRIPT)
@@ -113,6 +139,61 @@ class TestSuccessfulPatch:
         healed = Path(result.healed_script_path).read_text(encoding="utf-8")
         assert "#submitBtn" in healed
         assert "#submit_old" not in healed
+
+    def test_locator_helper_wrapper_patched(self, patcher, tmp_dir):
+        script = _write_script(tmp_dir, "helper_test.py", LOCATOR_HELPER_SCRIPT)
+        output = tmp_dir / "helper_healed.py"
+
+        result = patcher.patch_locator(
+            script_path=str(script),
+            output_path=str(output),
+            failing_line=13,
+            old_locator="#update-pjkrofile",
+            new_locator="#update-profile",
+            action="locator",
+        )
+
+        assert result.status == "SUCCESS"
+        healed = Path(result.healed_script_path).read_text(encoding="utf-8")
+        assert "#update-profile" in healed
+        assert "#update-pjkrofile" not in healed
+
+    def test_locator_helper_wrapper_patched_with_offset_line(self, patcher, tmp_dir):
+        script = _write_script(tmp_dir, "helper_offset_test.py", LOCATOR_HELPER_SCRIPT)
+        output = tmp_dir / "helper_offset_healed.py"
+
+        result = patcher.patch_locator(
+            script_path=str(script),
+            output_path=str(output),
+            failing_line=14,
+            old_locator="#wor-email",
+            new_locator="#work-email",
+            action="locator",
+        )
+
+        assert result.status == "SUCCESS"
+        healed = Path(result.healed_script_path).read_text(encoding="utf-8")
+        assert "#work-email" in healed
+        assert "#wor-email" not in healed
+
+    def test_locator_helper_runtime_raise_line_patched_by_old_locator(self, patcher, tmp_dir):
+        script = _write_script(tmp_dir, "helper_runtime_line_test.py", LOCATOR_HELPER_SCRIPT)
+        output = tmp_dir / "helper_runtime_line_healed.py"
+
+        result = patcher.patch_locator(
+            script_path=str(script),
+            output_path=str(output),
+            failing_line=5,
+            old_locator="#update-pjkrofile",
+            new_locator="#update-profile",
+            action="locator",
+        )
+
+        assert result.status == "SUCCESS"
+        assert "exact old locator literal" in result.message
+        healed = Path(result.healed_script_path).read_text(encoding="utf-8")
+        assert 'require_locator(page, "#update-profile")' in healed
+        assert "#update-pjkrofile" not in healed
 
     def test_healed_script_is_valid_python(self, patcher, tmp_dir):
         script = _write_script(tmp_dir, "valid_test.py", FILL_SCRIPT)

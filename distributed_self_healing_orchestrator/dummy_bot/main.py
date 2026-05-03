@@ -12,6 +12,10 @@ HEARTBEAT_INTERVAL_SECONDS = 5
 bot_running = True  # Flag to control heartbeat
 
 
+def env_flag(name: str, default: str = "false") -> bool:
+    return os.getenv(name, default).strip().lower() in {"1", "true", "yes"}
+
+
 def send_heartbeat():
     """Send heartbeat to orchestrator every 5 seconds until bot stops."""
     global bot_running
@@ -41,6 +45,23 @@ def send_failure_report(page, exc: Exception) -> None:
         page_url = page.url if page else "unknown"
         page_html = page.content() if page else ""
 
+        # Use absolute path so healing engine can resolve script without RPA_ROOT.
+        script_path = os.path.abspath(__file__)
+
+        # Extract failing line from traceback if possible.
+        failing_line = 1
+        tb = exc.__traceback__
+        while tb:
+            if tb.tb_frame.f_code.co_filename == __file__:
+                failing_line = tb.tb_lineno
+            tb = tb.tb_next
+
+        # Keep old locator aligned with the actual Playwright error string.
+        error_text = str(exc)
+        old_locator = ""
+        if "Element not found:" in error_text:
+            old_locator = error_text.split("Element not found:", 1)[1].strip()
+
         screenshot_path = ""
         try:
             os.makedirs("rpa", exist_ok=True)
@@ -50,25 +71,28 @@ def send_failure_report(page, exc: Exception) -> None:
         except Exception:
             pass
 
-        failure_type = "ElementNotFound"
+        failure_type = "ELEMENT_NOT_FOUND"
         if isinstance(exc, PlaywrightTimeoutError):
-            failure_type = "TimeoutError"
+            failure_type = "TIMEOUT_ERROR"
 
         payload = {
             "botId": BOT_ID,
             "page_url": page_url,
             "failure_type": failure_type,
-            "failed_action": "update_profile",
+            "failed_action": "locator",
             "element_role": "form_field",
             "expected_text": "Update Profile",
-            "old_locator": "//button[contains(text(), 'Update Profile')]",
-            "old_locator_type": "xpath",
-            "error_message": str(exc),
+            "old_locator": old_locator,
+            "old_locator_type": "css",
+            "error_message": error_text,
             "page_html": page_html,
             "screenshot_path": screenshot_path,
             "metadata": {
                 "bot_id": BOT_ID,
                 "bot_service": "dummy_bot",
+                "script_path": script_path,
+                "failing_line": failing_line,
+                "page_name": "settings",
                 "run_id": f"RUN-DUMMY-{datetime.now(UTC).strftime('%Y%m%d%H%M%S')}",
             }
         }
@@ -101,7 +125,7 @@ def run():
 
     try:
         with sync_playwright() as p:
-            browser = p.chromium.launch(headless=False, slow_mo=800)
+            browser = p.chromium.launch(headless=env_flag("HEADLESS"), slow_mo=800)
             page = browser.new_page()
 
             page.goto(url)
@@ -140,7 +164,7 @@ def run():
                 contact_number.type("+1234567890", delay=100)
                 page.wait_for_timeout(250)
 
-                update_profile = require_locator(page, "#update-sprofile")
+                update_profile = require_locator(page, "#update-profile")
                 update_profile.click()
 
                 page.wait_for_timeout(5000)

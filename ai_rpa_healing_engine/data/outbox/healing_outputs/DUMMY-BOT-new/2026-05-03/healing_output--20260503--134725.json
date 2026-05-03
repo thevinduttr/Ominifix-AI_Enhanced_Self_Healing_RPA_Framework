@@ -1,0 +1,58 @@
+{
+  "metadata": {
+    "healing_id": "HEAL-f42249a3-b457-4f88-8498-e193c0e34a11",
+    "report_id": "ELR-e1156551-497a-454f-8802-f1733c061f2d",
+    "run_id": "RUN-DUMMY-20260503134639",
+    "bot_id": "DUMMY-BOT-new",
+    "timestamp": "2026-05-03T13:47:25.686422",
+    "source_component": "code_healing_engine",
+    "target_component": "code_healing_engine"
+  },
+  "failure_context": {
+    "script_path": "F:\\git\\Ominifix-AI_Enhanced_Self_Healing_RPA_Framework\\distributed_self_healing_orchestrator\\dummy_bot\\main.py",
+    "failing_line": 113,
+    "action": "locator",
+    "old_locator": "#update-pjkrofile",
+    "error_type": "UI_SELECTOR_CHANGED",
+    "error_message": "Element not found: #update-pjkrofile"
+  },
+  "dom_context": {
+    "page_url": "https://bank-system-for-rp-system.vercel.app/settings",
+    "page_name": "settings",
+    "new_element_html": "<button type=\"submit\" id=\"update-profile\" class=\"form-btn strong\">Update Profile</button>"
+  },
+  "element_expectation": {
+    "expected_role": "form_field",
+    "expected_text": "Update Profile"
+  },
+  "element_candidate": {
+    "css": "button#update-profile",
+    "xpath": "/html/body/div/div/main/section/section[2]/article[1]/form/div[2]/button[2]",
+    "full_xpath": "/html/body/div/div/main/section/section[2]/article[1]/form/div[2]/button[2]",
+    "score": 100.0,
+    "strategy": "attribute_text_similarity"
+  },
+  "healing_summary": {
+    "status": "SUCCESS",
+    "strategy_used": "CLICK_ONLY",
+    "action": "locator",
+    "old_locator": "#update-pjkrofile",
+    "new_locator": "#update-profile",
+    "confidence": 1.0,
+    "patcher": "LibCST",
+    "validation": {
+      "valid": true,
+      "reason": "OK"
+    }
+  },
+  "script_output": {
+    "original_script_path": "/workspace/distributed_self_healing_orchestrator/dummy_bot/main.py",
+    "healed_script_path": "data/outbox/healed_scripts/DUMMY-BOT-new/2026-05-03/healed_script--20260503--134725.py"
+  },
+  "model_info": {
+    "model": "strategy_selector_v1",
+    "confidence": 0.618082861640793,
+    "healing_mode": "conservative",
+    "ml_confidence": 0.618082861640793
+  }
+}

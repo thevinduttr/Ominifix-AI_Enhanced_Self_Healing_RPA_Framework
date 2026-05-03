@@ -182,6 +182,26 @@ services:
     depends_on:
       - orchestrator_monitor
 
+  dummy_bot:
+    build:
+      context: ./distributed_self_healing_orchestrator
+      dockerfile: dummy_bot/Dockerfile
+    command: ["python", "rpa/run_healed_or_original.py"]
+    environment:
+      - ORCHESTRATOR_URL=http://orchestrator_monitor:8000
+      - MONITOR_URL=http://orchestrator_monitor:8000/heartbeat
+      - BOT_ID=DUMMY-BOT-new
+      - HEARTBEAT_INTERVAL=5
+      - HEADLESS=true
+      - KEEP_ALIVE_AFTER_SUCCESS=true
+      - USE_HEALED_SCRIPT=true
+      - HEALED_SCRIPTS_DIR=/app/healed_scripts
+      - ORIGINAL_BOT_SCRIPT=/app/main.py
+    volumes:
+      - ./ai_rpa_healing_engine/data/outbox/healed_scripts:/app/healed_scripts:ro
+    depends_on:
+      - orchestrator_monitor
+
   # bot_logic_error:
   #   build:
   #     context: ./distributed_self_healing_orchestrator
@@ -254,6 +274,31 @@ services:
       - ./ai_rpa_healing_engine/data/outbox/healed_scripts:/app/healed_scripts:ro
     ports:
       - "6080:6080"
+    depends_on:
+      - orchestrator_monitor
+    profiles:
+      - vnc
+
+  dummy_bot_vnc:
+    build:
+      context: ./distributed_self_healing_orchestrator
+      dockerfile: dummy_bot/Dockerfile.vnc
+    command:
+      [
+        "/bin/bash",
+        "-lc",
+        "rm -f /tmp/.X99-lock /tmp/.X11-unix/X99; exec /app/start_bot_vnc.sh",
+      ]
+    environment:
+      - MONITOR_URL=http://orchestrator_monitor:8000/heartbeat
+      - BOT_ID=DUMMY-BOT-new
+      - BOT_SERVICE_NAME=dummy_bot_vnc
+      - HEARTBEAT_INTERVAL=3
+      - HEADLESS=false
+      - KEEP_ALIVE_AFTER_SUCCESS=true
+      - BOT_COMMAND=python main.py
+    ports:
+      - "6081:6080"
     depends_on:
       - orchestrator_monitor
     profiles:

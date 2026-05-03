@@ -1,4 +1,4 @@
-FROM ominifix-ai_enhanced_self_healing_rpa_framework-bot_form_filler_rpa:latest
+FROM mcr.microsoft.com/playwright/python:v1.53.0-noble
 
 WORKDIR /app
 
@@ -10,6 +10,8 @@ RUN set -e; \
             novnc \
             websockify \
             && rm -rf /var/lib/apt/lists/*
+
+RUN python -m pip install --no-cache-dir --upgrade --ignore-installed requests selenium playwright==1.53.0
 
 COPY dummy_bot /app
 RUN chmod +x /app/start_bot_vnc.sh

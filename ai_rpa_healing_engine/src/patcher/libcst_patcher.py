@@ -139,6 +139,28 @@ class _ExactMatchPatchTransformer(cst.CSTTransformer):
         return updated_node.with_changes(args=new_args)
 
 
+class _ExactStringPatchTransformer(cst.CSTTransformer):
+    def __init__(self, old_locator: str, new_locator: str):
+        self.old_locator = old_locator
+        self.new_locator = new_locator
+        self.did_patch = False
+
+    def leave_SimpleString(
+        self,
+        original_node: cst.SimpleString,
+        updated_node: cst.SimpleString,
+    ) -> cst.SimpleString:
+        if self.did_patch:
+            return updated_node
+
+        old_val = _literal_string_value(original_node)
+        if old_val != self.old_locator:
+            return updated_node
+
+        self.did_patch = True
+        return _make_string_literal(self.new_locator)
+
+
 class ScriptPatcher:
     @staticmethod
     def _similarity(a: str, b: str) -> int:
@@ -151,8 +173,10 @@ class ScriptPatcher:
     def _line_fallback_patch(code: str, failing_line: int, action: str, new_locator: str) -> tuple[bool, Optional[str], str]:
         """
         Safe last-resort patch:
-        - Only touches the single failing line.
-        - Finds ".<action>(" on that line.
+        - Touches the reported failing line or a nearby line when the upstream
+          line number is off by a small amount.
+        - Finds a patchable call on that line, including wrapper helpers such as
+          require_locator(...), not just method calls like .locator(...).
         - Replaces the FIRST string literal argument inside that call.
         Returns: (patched, found_old, new_code)
         """
@@ -161,53 +185,76 @@ class ScriptPatcher:
         if idx < 0 or idx >= len(lines):
             return False, None, code
 
-        line = lines[idx]
+        # Search a small window around the reported line to tolerate off-by-one
+        # or slightly shifted failing_line values from upstream reporters.
+        window = 2
+        candidate_indices = []
+        for delta in range(0, window + 1):
+            for signed in (0, -delta, delta):
+                candidate = idx + signed
+                if 0 <= candidate < len(lines) and candidate not in candidate_indices:
+                    candidate_indices.append(candidate)
 
-        # Must contain .action(
-        marker = f".{action}("
-        pos = line.find(marker)
-        if pos == -1:
-            return False, None, code
+        # Prefer the exact action marker, but also support wrapper helpers for locator actions.
+        markers = [f".{action}("]
+        if action == "locator":
+            markers = [".locator(", "require_locator(", "locator("]
 
-        # From after ".action(", find first quote
-        start = pos + len(marker)
-        m = re.search(r"""(['"])""", line[start:])
-        if not m:
-            return False, None, code
+        for candidate_idx in candidate_indices:
+            line = lines[candidate_idx]
 
-        q = m.group(1)
-        qpos = start + m.start()
+            pos = -1
+            marker = ""
+            for candidate in markers:
+                candidate_pos = line.find(candidate)
+                if candidate_pos != -1 and (pos == -1 or candidate_pos < pos):
+                    pos = candidate_pos
+                    marker = candidate
 
-        # Find matching closing quote (simple, safe)
-        # This assumes selector is a normal quoted string on the same line (true for your RPA file).
-        end = qpos + 1
-        escaped = False
-        while end < len(line):
-            ch = line[end]
-            if escaped:
-                escaped = False
-            elif ch == "\\":
-                escaped = True
-            elif ch == q:
-                break
-            end += 1
+            if pos == -1:
+                continue
 
-        if end >= len(line) or line[end] != q:
-            return False, None, code
+            # From after the call opener, find first quote.
+            start = pos + len(marker)
+            m = re.search(r"""(['"])""", line[start:])
+            if not m:
+                continue
 
-        literal = line[qpos:end + 1]  # includes quotes
+            q = m.group(1)
+            qpos = start + m.start()
 
-        # Parse the literal to get old value safely
-        try:
-            found_old = ast.literal_eval(literal)
-        except Exception:
-            return False, None, code
+            # Find matching closing quote (simple, safe)
+            # This assumes selector is a normal quoted string on the same line (true for your RPA file).
+            end = qpos + 1
+            escaped = False
+            while end < len(line):
+                ch = line[end]
+                if escaped:
+                    escaped = False
+                elif ch == "\\":
+                    escaped = True
+                elif ch == q:
+                    break
+                end += 1
 
-        # Replace with a double-quoted literal
-        new_lit = '"' + new_locator.replace("\\", "\\\\").replace('"', '\\"') + '"'
-        new_line = line[:qpos] + new_lit + line[end + 1:]
-        lines[idx] = new_line
-        return True, str(found_old), "".join(lines)
+            if end >= len(line) or line[end] != q:
+                continue
+
+            literal = line[qpos:end + 1]  # includes quotes
+
+            # Parse the literal to get old value safely
+            try:
+                found_old = ast.literal_eval(literal)
+            except Exception:
+                continue
+
+            # Replace with a double-quoted literal
+            new_lit = '"' + new_locator.replace("\\", "\\\\").replace('"', '\\"') + '"'
+            new_line = line[:qpos] + new_lit + line[end + 1:]
+            lines[candidate_idx] = new_line
+            return True, str(found_old), "".join(lines)
+
+        return False, None, code
 
     def patch_locator(
         self,
@@ -287,6 +334,25 @@ class ScriptPatcher:
                     healed_script_path=str(out_path),
                 )
 
+            # ---- 2b) LibCST exact string fallback ----
+            # Some bots wrap Playwright calls in helpers such as
+            # require_locator(page, "#broken"). In those cases the runtime
+            # failing_line can point to the helper's raise statement rather than
+            # the call site. Patch the exact old locator literal once.
+            string_tx = _ExactStringPatchTransformer(old_locator, new_locator)
+            modified3 = module.visit(string_tx)
+            if string_tx.did_patch:
+                out_path = Path(output_path)
+                out_path.parent.mkdir(parents=True, exist_ok=True)
+                out_path.write_text(modified3.code, encoding="utf-8")
+                return PatchResult(
+                    status="SUCCESS",
+                    message="LibCST patch applied using exact old locator literal (format preserved).",
+                    old_locator=old_locator,
+                    new_locator=new_locator,
+                    healed_script_path=str(out_path),
+                )
+
         except Exception:
             # If LibCST parsing/metadata fails for any reason, we still attempt line fallback below
             pass
@@ -308,7 +374,7 @@ class ScriptPatcher:
         return PatchResult(
             status="FAILED",
             message=(
-                f"Patch failed: No patchable '.{action}(\"...\")' call located using failing_line={failing_line}, "
+                f"Patch failed: No patchable '{action}' call located using failing_line={failing_line}, "
                 f"no exact match for old_locator, and single-line fallback did not detect a selector string."
             ),
             old_locator=old_locator,

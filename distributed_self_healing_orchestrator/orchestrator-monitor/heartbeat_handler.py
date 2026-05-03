@@ -111,6 +111,32 @@ def _extract_ptqa_recommendation(data):
     return str(data.get('recommendation') or '').strip()
 
 
+def _extract_healed_script_path(data):
+    """Read healed script path from common healing/PTQA payload shapes."""
+    if not isinstance(data, dict):
+        return ""
+
+    script_output = data.get('script_output')
+    if isinstance(script_output, dict):
+        path = str(script_output.get('healed_script_path') or '').strip()
+        if path:
+            return path
+
+    healing_result = data.get('healing_result')
+    if isinstance(healing_result, dict):
+        path = _extract_healed_script_path(healing_result)
+        if path:
+            return path
+
+    raw_payload = data.get('raw_payload')
+    if isinstance(raw_payload, dict):
+        path = _extract_healed_script_path(raw_payload)
+        if path:
+            return path
+
+    return str(data.get('healed_script_path') or '').strip()
+
+
 def _get_docker_client():
     global _docker_client
     if _docker_client is None:
@@ -208,6 +234,11 @@ def _restart_bot_on_ptqa_approval(failure, ptqa_result):
     if recommendation not in PTQA_APPROVED_RECOMMENDATIONS:
         return
 
+    healed_script_path = (
+        _extract_healed_script_path(failure.get('healing_result'))
+        or _extract_healed_script_path(ptqa_result)
+    )
+
     bot_id = failure.get('botId') or (failure.get('metadata') or {}).get('bot_id')
     if not bot_id:
         failure['ptqa_restart_error'] = 'missing botId'
@@ -246,6 +277,7 @@ def _restart_bot_on_ptqa_approval(failure, ptqa_result):
             'trigger': 'PTQA_APPROVED',
             'recommendation': recommendation,
             'bot_id': bot_id,
+            'healed_script_path': healed_script_path,
             'service': service_name,
             'container': container.name,
             'delay_seconds': restart_delay,
