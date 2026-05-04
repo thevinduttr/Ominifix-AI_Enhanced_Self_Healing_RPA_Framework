@@ -12,6 +12,7 @@ def publish_failure_event(bot_id):
         pika.ConnectionParameters(rabbit_host, credentials=credentials)
     )
     channel = connection.channel()
+    #channel like a communication  line inside the rabbitmq server, we can have multiple channels in a single connection
     channel.queue_declare(queue="bot.failure")
 
     event = json.dumps({"botId": bot_id})
