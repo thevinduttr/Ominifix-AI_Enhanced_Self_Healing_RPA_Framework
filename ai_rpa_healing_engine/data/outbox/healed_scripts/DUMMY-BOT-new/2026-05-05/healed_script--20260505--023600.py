@@ -9,8 +9,8 @@ from pathlib import Path
 import requests
 from playwright.sync_api import sync_playwright, TimeoutError as PlaywrightTimeoutError
 
-#url = "https://bank-system-for-rp-system.vercel.app/"
-url ='http://localhost:5174/'
+url = "https://bank-system-for-rp-system.vercel.app/"
+#url ='http://localhost:5174/'
 BOT_ID = os.getenv("BOT_ID", "DUMMY-BOT-new")
 ORCHESTRATOR_URL = os.getenv("ORCHESTRATOR_URL") or os.getenv("MONITOR_URL", "http://localhost:8000")
 ORCHESTRATOR_URL = ORCHESTRATOR_URL.removesuffix("/heartbeat")

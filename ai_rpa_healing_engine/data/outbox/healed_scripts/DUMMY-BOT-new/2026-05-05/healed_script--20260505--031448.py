@@ -267,7 +267,7 @@ def fill_customer_onboarding_form(page, customer_data: dict) -> dict:
     branch_value = customer_data["branch"]
     notes_value = customer_data["notes"]
     
-    customer_fullname = require_locator(page, "#customer-fullname")
+    customer_fullname = require_locator(page, "#customer-fullna")
     customer_fullname.click()
     customer_fullname.fill("")
     customer_fullname.type(fullname_value, delay=100)

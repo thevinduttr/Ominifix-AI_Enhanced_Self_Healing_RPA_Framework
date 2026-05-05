@@ -1,0 +1,58 @@
+{
+  "metadata": {
+    "healing_id": "HEAL-2dab5662-dddc-43ff-b73b-523620806c1e",
+    "report_id": "ELR-3bb3d530-119c-4ef7-9426-e482f67a1371",
+    "run_id": "RUN-DUMMY-20260504164542",
+    "bot_id": "DUMMY-BOT-new",
+    "timestamp": "2026-05-04T16:51:38.983267",
+    "source_component": "code_healing_engine",
+    "target_component": "code_healing_engine"
+  },
+  "failure_context": {
+    "script_path": "F:\\git\\Ominifix-AI_Enhanced_Self_Healing_RPA_Framework\\distributed_self_healing_orchestrator\\dummy_bot\\main.py",
+    "failing_line": 124,
+    "action": "locator",
+    "old_locator": "#customr-fullname",
+    "error_type": "ELEMENT_NOT_VISIBLE",
+    "error_message": "Element not found: #customr-fullname"
+  },
+  "dom_context": {
+    "page_url": "https://bank-system-for-rp-system.vercel.app/customers",
+    "page_name": "settings",
+    "new_element_html": "<input id=\"customer-fullname\" placeholder=\"e.g. Nimal Jayasuriya\" type=\"text\" value=\"\"/>"
+  },
+  "element_expectation": {
+    "expected_role": "form_field",
+    "expected_text": "Update Profile"
+  },
+  "element_candidate": {
+    "css": "input#customer-fullname",
+    "xpath": "/html/body/div/div/main/section/section/article[1]/form/div[1]/label[1]/input",
+    "full_xpath": "/html/body/div/div/main/section/section/article[1]/form/div[1]/label[1]/input",
+    "score": 92.86,
+    "strategy": "attribute_text_similarity"
+  },
+  "healing_summary": {
+    "status": "SUCCESS",
+    "strategy_used": "LOCATOR_REGEN_LIBCST",
+    "action": "locator",
+    "old_locator": "#customr-fullname",
+    "new_locator": "#customer-fullname",
+    "confidence": 1.0,
+    "patcher": "LibCST",
+    "validation": {
+      "valid": true,
+      "reason": "OK"
+    }
+  },
+  "script_output": {
+    "original_script_path": "/workspace/distributed_self_healing_orchestrator/dummy_bot/main.py",
+    "healed_script_path": "data/outbox/healed_scripts/DUMMY-BOT-new/2026-05-04/healed_script--20260504--165138.py"
+  },
+  "model_info": {
+    "model": "strategy_selector_v1",
+    "confidence": 0.7408686967768162,
+    "healing_mode": "aggressive",
+    "ml_confidence": 0.7408686967768162
+  }
+}

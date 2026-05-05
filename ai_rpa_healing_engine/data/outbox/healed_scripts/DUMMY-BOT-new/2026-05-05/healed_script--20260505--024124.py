@@ -267,13 +267,13 @@ def fill_customer_onboarding_form(page, customer_data: dict) -> dict:
     branch_value = customer_data["branch"]
     notes_value = customer_data["notes"]
     
-    customer_fullname = require_locator(page, "#customer-fullname")
+    customer_fullname = require_locator(page, "#customer-fullna")
     customer_fullname.click()
     customer_fullname.fill("")
     customer_fullname.type(fullname_value, delay=100)
     page.wait_for_timeout(200)
 
-    customer_segment = require_locator(page, "#customer-segment")
+    customer_segment = require_locator(page, "input[name=\"customer-gender\"]")
     customer_segment.select_option(label=segment_value)
 
     customer_id = require_locator(page, "#customer-id")

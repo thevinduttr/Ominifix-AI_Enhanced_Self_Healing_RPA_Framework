@@ -1,0 +1,58 @@
+{
+  "metadata": {
+    "healing_id": "HEAL-dd8ac9a6-e517-41ac-a2b6-d7107fcaa6f1",
+    "report_id": "ELR-593e8415-4fed-4772-bef3-b995944d5389",
+    "run_id": "RUN-DUMMY-20260504143144",
+    "bot_id": "DUMMY-BOT-new",
+    "timestamp": "2026-05-04T14:31:44.611830",
+    "source_component": "code_healing_engine",
+    "target_component": "code_healing_engine"
+  },
+  "failure_context": {
+    "script_path": "/app/main.py",
+    "failing_line": 124,
+    "action": "locator",
+    "old_locator": "#customer-term",
+    "error_type": "ELEMENT_NOT_FOUND",
+    "error_message": "Element not found: #customer-term"
+  },
+  "dom_context": {
+    "page_url": "https://bank-system-for-rp-system.vercel.app/customers",
+    "page_name": "settings",
+    "new_element_html": "<input id=\"customer-terms\" type=\"checkbox\"/>I confirm this onboarding profile has customer consent for processing."
+  },
+  "element_expectation": {
+    "expected_role": "form_field",
+    "expected_text": "Update Profile"
+  },
+  "element_candidate": {
+    "css": "input#customer-terms",
+    "xpath": "/html/body/div/div/main/section/section/article[1]/form/label[1]/input",
+    "full_xpath": "/html/body/div/div/main/section/section/article[1]/form/label[1]/input",
+    "score": 90.0,
+    "strategy": "attribute_text_similarity"
+  },
+  "healing_summary": {
+    "status": "SUCCESS",
+    "strategy_used": "LOCATOR_REGEN_LIBCST",
+    "action": "locator",
+    "old_locator": "#customer-term",
+    "new_locator": "#customer-terms",
+    "confidence": 1.0,
+    "patcher": "LibCST",
+    "validation": {
+      "valid": true,
+      "reason": "OK"
+    }
+  },
+  "script_output": {
+    "original_script_path": "/workspace/distributed_self_healing_orchestrator/dummy_bot/main.py",
+    "healed_script_path": "data/outbox/healed_scripts/DUMMY-BOT-new/2026-05-04/healed_script--20260504--143144.py"
+  },
+  "model_info": {
+    "model": "strategy_selector_v1",
+    "confidence": 0.7327714745297128,
+    "healing_mode": "aggressive",
+    "ml_confidence": 0.7327714745297128
+  }
+}

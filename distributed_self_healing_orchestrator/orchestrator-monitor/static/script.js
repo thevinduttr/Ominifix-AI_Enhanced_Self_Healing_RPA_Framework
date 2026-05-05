@@ -1,71 +1,139 @@
-function formatAge(seconds){
-  if(seconds < 5) return 'now';
-  if(seconds < 60) return `${seconds}s ago`;
-  if(seconds < 3600) return `${Math.floor(seconds/60)}m ${seconds%60}s ago`;
-  return `${Math.floor(seconds/3600)}h ${Math.floor((seconds%3600)/60)}m ago`;
+function formatAge(seconds) {
+  if (seconds < 5) return 'now';
+  if (seconds < 60) return `${seconds}s ago`;
+  if (seconds < 3600) return `${Math.floor(seconds / 60)}m ${seconds % 60}s ago`;
+  return `${Math.floor(seconds / 3600)}h ${Math.floor((seconds % 3600) / 60)}m ago`;
 }
 
-async function fetchStatus(){
-  try{
+async function fetchStatus() {
+  try {
     const res = await fetch('/status');
-    if(!res.ok) throw new Error('Network response was not ok');
+    if (!res.ok) throw new Error('Network response was not ok');
     const data = await res.json();
     renderBots(data.bots || {});
     document.getElementById('last-update').textContent = new Date().toLocaleString();
     // update charts based on current data
-      updateChartsFromData(data.bots || {});
-      // render recent failures list if available
-      if(data.failures){ renderFailures(data.failures); }
-  }catch(e){
+    updateChartsFromData(data.bots || {});
+    // render recent failures list if available
+    if (data.failures) { renderFailures(data.failures); }
+
+    // Detect PTQA blocked decisions and show banner/desktop notification
+    try {
+      checkForPtqaBlocked(data.failures || []);
+    } catch (_e) { /* non-fatal */ }
+  } catch (e) {
     console.error(e);
     document.getElementById('bots-tbody').innerHTML = '<tr><td colspan="3" class="muted">Error loading status</td></tr>';
   }
 }
 
-function renderFailures(failures){
+function clearPtqaBanner() {
+  const b = document.getElementById('ptqa-banner');
+  const title = document.getElementById('ptqa-banner-title');
+  const body = document.getElementById('ptqa-banner-body');
+  if (!b) return;
+  b.style.display = 'none';
+  if (title) title.textContent = 'PTQA: BLOCK_HEALING';
+  if (body) body.textContent = '';
+}
+
+function showPtqaBanner(failure) {
+  const b = document.getElementById('ptqa-banner');
+  const title = document.getElementById('ptqa-banner-title');
+  const body = document.getElementById('ptqa-banner-body');
+  if (!b) return;
+  const bot = failure.botId || (failure.metadata && failure.metadata.bot_id) || 'unknown';
+  const ptqa = (failure.ptqa_result) ? failure.ptqa_result : (failure.ptqaResult || {});
+  const reason = Array.isArray(ptqa.reasons) && ptqa.reasons.length ? String(ptqa.reasons[0]) : (ptqa.reason || failure.error || 'Blocked by PTQA');
+  if (title) title.textContent = `PTQA BLOCK on ${bot}`;
+  if (body) body.textContent = reason;
+  b.style.display = 'block';
+
+  // Make banner clickable to open the failure modal if available
+  b.onclick = async () => {
+    try {
+      // try to resolve latest version of the failure and open modal
+      const resolved = await resolveLatestFailure(failure);
+      showFailureJson(resolved || failure);
+    } catch (e) { console.warn('Could not open failure modal', e); }
+  };
+
+  // Desktop notification (request permission if needed)
+  try {
+    if (typeof Notification !== 'undefined') {
+      if (Notification.permission === 'granted') {
+        new Notification('PTQA: BLOCK_HEALING', { body: `${bot}: ${reason}` });
+      } else if (Notification.permission !== 'denied') {
+        Notification.requestPermission().then(p => { if (p === 'granted') new Notification('PTQA: BLOCK_HEALING', { body: `${bot}: ${reason}` }); });
+      }
+    }
+  } catch (_e) { }
+}
+
+function checkForPtqaBlocked(failures) {
+  if (!Array.isArray(failures) || failures.length === 0) { clearPtqaBanner(); return; }
+  // find most recent failure that has PTQA result recommending BLOCK_HEALING
+  for (const f of failures) {
+    const ptqa = f && (f.ptqa_result || f.ptqaResult || f.ptqa_output || {});
+    const rec = (ptqa && ptqa.recommendation) ? String(ptqa.recommendation).toUpperCase() : '';
+    if (rec === 'BLOCK_HEALING') {
+      showPtqaBanner(f);
+      return;
+    }
+    // Also support raw top-level recommendation field as fallback
+    const topRec = (f && f.recommendation) ? String(f.recommendation).toUpperCase() : '';
+    if (topRec === 'BLOCK_HEALING') {
+      showPtqaBanner(f);
+      return;
+    }
+  }
+  clearPtqaBanner();
+}
+
+function renderFailures(failures) {
   const el = document.getElementById('recent-failures');
-  if(!el) return;
-  if(!failures || failures.length === 0){ el.innerHTML = '<div class="muted">No failures yet</div>'; return; }
-    const items = failures.slice(0,10).map((f, idx) => {
-    const t = new Date((f.timestamp||0)*1000);
-    const err = f.error ? `<div style="margin-top:8px;color:#ffdede;font-size:0.9rem">${escapeHtml((f.error||'')).slice(0,240)}</div>` : '';
+  if (!el) return;
+  if (!failures || failures.length === 0) { el.innerHTML = '<div class="muted">No failures yet</div>'; return; }
+  const items = failures.slice(0, 10).map((f, idx) => {
+    const t = new Date((f.timestamp || 0) * 1000);
+    const err = f.error ? `<div style="margin-top:8px;color:#ffdede;font-size:0.9rem">${escapeHtml((f.error || '')).slice(0, 240)}</div>` : '';
     // build category badge with confidence and emphasis
     let categoryBadge = '';
-    if(f.category){
-      const conf = (typeof f.confidence === 'number') ? ` ${Math.round(f.confidence*100)}%` : '';
+    if (f.category) {
+      const conf = (typeof f.confidence === 'number') ? ` ${Math.round(f.confidence * 100)}%` : '';
       const cls = (f.category === 'unknown') ? 'category-badge unknown' : ((f.confidence && f.confidence >= 0.7) ? 'category-badge confident' : 'category-badge');
       categoryBadge = `<div style="margin-left:8px;display:inline-block"><span class="${cls}">${escapeHtml(f.category)}${conf}</span></div>`;
     }
     const meta = [];
-    if(f.failure_type) meta.push(`<strong>Type:</strong> ${escapeHtml(f.failure_type)}`);
-    if(f.last_action || f.failed_action) meta.push(`<strong>Action:</strong> ${escapeHtml(f.failed_action || f.last_action)}`);
-    if(f.strategy) meta.push(`<strong>Strategy:</strong> ${escapeHtml(f.strategy)}`);
-    if(f.priority) meta.push(`<strong>Priority:</strong> ${escapeHtml(f.priority)}`);
-    if(f.locator_report_id) meta.push(`<strong>Locator Report:</strong> ${escapeHtml(f.locator_report_id)}`);
-    if(f.locator_report && f.locator_report.element_candidate){
+    if (f.failure_type) meta.push(`<strong>Type:</strong> ${escapeHtml(f.failure_type)}`);
+    if (f.last_action || f.failed_action) meta.push(`<strong>Action:</strong> ${escapeHtml(f.failed_action || f.last_action)}`);
+    if (f.strategy) meta.push(`<strong>Strategy:</strong> ${escapeHtml(f.strategy)}`);
+    if (f.priority) meta.push(`<strong>Priority:</strong> ${escapeHtml(f.priority)}`);
+    if (f.locator_report_id) meta.push(`<strong>Locator Report:</strong> ${escapeHtml(f.locator_report_id)}`);
+    if (f.locator_report && f.locator_report.element_candidate) {
       const c = f.locator_report.element_candidate;
       const score = (typeof c.score === 'number') ? c.score.toFixed(3) : 'N/A';
       meta.push(`<strong>Locator:</strong> ${escapeHtml(c.strategy || 'N/A')} (score ${escapeHtml(score)})`);
     }
-    
+
     // New comprehensive fields display
     const comprehensiveInfo = [];
-    if(f.page_url) comprehensiveInfo.push(`<strong>Page URL:</strong> <a href="${escapeHtml(f.page_url)}" target="_blank" style="color:#60a5fa">${escapeHtml(f.page_url).slice(0,60)}${f.page_url.length>60?'...':''}</a>`);
-    if(f.element_role) comprehensiveInfo.push(`<strong>Element Role:</strong> ${escapeHtml(f.element_role)}`);
-    if(f.expected_text) comprehensiveInfo.push(`<strong>Expected Text:</strong> ${escapeHtml(f.expected_text).slice(0,50)}${f.expected_text.length>50?'...':''}`);
-    if(f.old_locator) comprehensiveInfo.push(`<strong>Old Locator:</strong> <code style="background:rgba(0,0,0,0.3);padding:2px 6px;border-radius:4px">${escapeHtml(f.old_locator).slice(0,60)}${f.old_locator.length>60?'...':''}</code>`);
-    if(f.old_locator_type) comprehensiveInfo.push(`<strong>Locator Type:</strong> ${escapeHtml(f.old_locator_type)}`);
-    if(f.screenshot_path) comprehensiveInfo.push(`<strong>Screenshot:</strong> <span style="color:#10b981">${escapeHtml(f.screenshot_path.split('/').pop())}</span>`);
-    
+    if (f.page_url) comprehensiveInfo.push(`<strong>Page URL:</strong> <a href="${escapeHtml(f.page_url)}" target="_blank" style="color:#60a5fa">${escapeHtml(f.page_url).slice(0, 60)}${f.page_url.length > 60 ? '...' : ''}</a>`);
+    if (f.element_role) comprehensiveInfo.push(`<strong>Element Role:</strong> ${escapeHtml(f.element_role)}`);
+    if (f.expected_text) comprehensiveInfo.push(`<strong>Expected Text:</strong> ${escapeHtml(f.expected_text).slice(0, 50)}${f.expected_text.length > 50 ? '...' : ''}`);
+    if (f.old_locator) comprehensiveInfo.push(`<strong>Old Locator:</strong> <code style="background:rgba(0,0,0,0.3);padding:2px 6px;border-radius:4px">${escapeHtml(f.old_locator).slice(0, 60)}${f.old_locator.length > 60 ? '...' : ''}</code>`);
+    if (f.old_locator_type) comprehensiveInfo.push(`<strong>Locator Type:</strong> ${escapeHtml(f.old_locator_type)}`);
+    if (f.screenshot_path) comprehensiveInfo.push(`<strong>Screenshot:</strong> <span style="color:#10b981">${escapeHtml(f.screenshot_path.split('/').pop())}</span>`);
+
     const comprehensiveHtml = comprehensiveInfo.length > 0 ? `<div style="margin-top:8px;color:#cbd5e1;font-size:0.85rem;line-height:1.8">${comprehensiveInfo.join('<br>')}</div>` : '';
-    
-    const domSnippet = f.dom ? escapeHtml(f.dom).slice(0,200) + (f.dom.length>200? '...':'') : '';
+
+    const domSnippet = f.dom ? escapeHtml(f.dom).slice(0, 200) + (f.dom.length > 200 ? '...' : '') : '';
     const domHtml = f.dom ? `<details style="margin-top:8px"><summary style="cursor:pointer">View DOM snapshot</summary><pre style="white-space:pre-wrap;max-height:220px;overflow:auto;background:rgba(0,0,0,0.04);padding:8px;border-radius:6px">${escapeHtml(f.dom)}</pre></details>` : '';
-    
+
     // Page HTML info
     const pageHtmlSize = f.page_html ? (f.page_html.length / 1024).toFixed(2) : null;
     const pageHtmlInfo = pageHtmlSize ? `<div style="margin-top:8px;color:#fbbf24;font-size:0.85rem"><strong>Page HTML:</strong> ${pageHtmlSize} KB captured</div>` : '';
-    
+
     return `
       <div class="failure-card" data-idx="${idx}" style="margin-bottom:10px;padding:10px;border-radius:8px;background:rgba(255,255,255,0.02);cursor:pointer">
         <div style="display:flex;justify-content:space-between;align-items:center">
@@ -84,17 +152,17 @@ function renderFailures(failures){
 
   // attach click handlers to open modal with raw JSON
   const cards = el.querySelectorAll('.failure-card');
-  cards.forEach((card)=>{
-    card.addEventListener('click', ()=>{
-      const idx = parseInt(card.getAttribute('data-idx'),10);
+  cards.forEach((card) => {
+    card.addEventListener('click', () => {
+      const idx = parseInt(card.getAttribute('data-idx'), 10);
       const f = failures[idx];
-      if(f) showFailureJson(f);
+      if (f) showFailureJson(f);
     });
   });
 }
 
-function escapeHtml(str){
-  if(!str) return '';
+function escapeHtml(str) {
+  if (!str) return '';
   return String(str)
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
@@ -103,31 +171,31 @@ function escapeHtml(str){
     .replace(/'/g, '&#39;');
 }
 
-function formatUnixTime(seconds){
-  if(!seconds) return '-';
+function formatUnixTime(seconds) {
+  if (!seconds) return '-';
   const d = new Date(seconds * 1000);
   return Number.isNaN(d.getTime()) ? String(seconds) : d.toLocaleString();
 }
 
-function formatIsoTime(value){
-  if(!value) return '-';
+function formatIsoTime(value) {
+  if (!value) return '-';
   const d = new Date(value);
   return Number.isNaN(d.getTime()) ? String(value) : d.toLocaleString();
 }
 
-function formatPercent(value){
-  if(typeof value !== 'number') return '-';
+function formatPercent(value) {
+  if (typeof value !== 'number') return '-';
   return `${Math.round(value * 100)}%`;
 }
 
-function formatNumber(value, digits = 3){
-  if(typeof value !== 'number') return '-';
+function formatNumber(value, digits = 3) {
+  if (typeof value !== 'number') return '-';
   return value.toFixed(digits);
 }
 
-function sectionCardHtml(title, rows){
+function sectionCardHtml(title, rows) {
   const visible = rows.filter((row) => row && row.value !== undefined && row.value !== null);
-  if(!visible.length) return '';
+  if (!visible.length) return '';
   const items = visible.map((row) => {
     const label = escapeHtml(row.label || '');
     const rawValue = row.value === '' ? '-' : String(row.value);
@@ -151,8 +219,8 @@ function sectionCardHtml(title, rows){
   `;
 }
 
-function listCardHtml(title, items){
-  if(!Array.isArray(items) || !items.length) return '';
+function listCardHtml(title, items) {
+  if (!Array.isArray(items) || !items.length) return '';
   const listItems = items.map((item) => `<li style="margin-bottom:6px">${escapeHtml(String(item))}</li>`).join('');
   return `
     <div style="border:1px solid rgba(255,255,255,0.08);border-radius:10px;padding:12px;background:rgba(255,255,255,0.02)">
@@ -162,35 +230,35 @@ function listCardHtml(title, items){
   `;
 }
 
-function parseMaybeJsonObject(value){
-  if(!value) return null;
-  if(typeof value === 'object') return value;
-  if(typeof value !== 'string') return null;
+function parseMaybeJsonObject(value) {
+  if (!value) return null;
+  if (typeof value === 'object') return value;
+  if (typeof value !== 'string') return null;
   const trimmed = value.trim();
-  if(!(trimmed.startsWith('{') || trimmed.startsWith('['))) return null;
-  try{
+  if (!(trimmed.startsWith('{') || trimmed.startsWith('['))) return null;
+  try {
     const parsed = JSON.parse(trimmed);
     return (parsed && typeof parsed === 'object') ? parsed : null;
-  }catch(_err){
+  } catch (_err) {
     return null;
   }
 }
 
-function firstObject(values){
-  for(const value of values){
+function firstObject(values) {
+  for (const value of values) {
     const parsed = parseMaybeJsonObject(value);
-    if(parsed) return parsed;
+    if (parsed) return parsed;
   }
   return {};
 }
 
-function looksLikeLocatorReport(value){
+function looksLikeLocatorReport(value) {
   const obj = parseMaybeJsonObject(value);
-  if(!obj || typeof obj !== 'object') return false;
+  if (!obj || typeof obj !== 'object') return false;
   return !!(obj.failure_context && obj.element_expectation && obj.metadata);
 }
 
-function failureLoadingHtml(){
+function failureLoadingHtml() {
   const block = `
     <div class="skeleton-card">
       <div class="skeleton-title"></div>
@@ -203,83 +271,83 @@ function failureLoadingHtml(){
   return `<div class="detail-loading-grid">${block}${block}${block}${block}</div>`;
 }
 
-function openFailureModalLoading(){
+function openFailureModalLoading() {
   const modal = document.getElementById('failure-modal');
   const pre = document.getElementById('failure-json-pre');
   const sectionsEl = document.getElementById('failure-sections');
   const rawBtn = document.getElementById('failure-toggle-raw');
   const domContainer = document.getElementById('failure-dom-container');
   const renderBtn = document.getElementById('failure-render-dom');
-  if(!modal || !sectionsEl) return false;
+  if (!modal || !sectionsEl) return false;
 
   sectionsEl.innerHTML = failureLoadingHtml();
-  if(pre) pre.style.display = 'none';
-  if(rawBtn){
+  if (pre) pre.style.display = 'none';
+  if (rawBtn) {
     rawBtn.textContent = 'Show Raw JSON (Debug)';
     rawBtn.onclick = null;
   }
-  if(domContainer){
+  if (domContainer) {
     domContainer.innerHTML = '';
     domContainer.style.display = 'none';
   }
-  if(renderBtn) renderBtn.style.display = 'none';
+  if (renderBtn) renderBtn.style.display = 'none';
 
   modal.style.display = 'flex';
   return true;
 }
 
-function sameFailure(a, b){
-  if(!a || !b) return false;
+function sameFailure(a, b) {
+  if (!a || !b) return false;
   const ar = a.locator_report_id || a.locator_report?.metadata?.report_id;
   const br = b.locator_report_id || b.locator_report?.metadata?.report_id;
-  if(ar && br && ar === br) return true;
+  if (ar && br && ar === br) return true;
 
   const at = Number(a.timestamp || 0);
   const bt = Number(b.timestamp || 0);
-  if((a.botId || '') === (b.botId || '') && at && bt && Math.abs(at - bt) < 0.01) return true;
+  if ((a.botId || '') === (b.botId || '') && at && bt && Math.abs(at - bt) < 0.01) return true;
   return false;
 }
 
-async function resolveLatestFailure(currentFailure){
-  try{
+async function resolveLatestFailure(currentFailure) {
+  try {
     const res = await fetch('/status');
-    if(!res.ok) return currentFailure;
+    if (!res.ok) return currentFailure;
     const data = await res.json();
     const list = Array.isArray(data.failures) ? data.failures : [];
-    for(const item of list){
-      if(sameFailure(item, currentFailure)) return item;
+    for (const item of list) {
+      if (sameFailure(item, currentFailure)) return item;
     }
-    if(currentFailure?.botId){
+    if (currentFailure?.botId) {
       const latestByBot = list.find((item) => item && item.botId === currentFailure.botId);
-      if(latestByBot) return latestByBot;
+      if (latestByBot) return latestByBot;
     }
     return currentFailure;
-  }catch(_err){
+  } catch (_err) {
     return currentFailure;
   }
 }
 
-async function showFailureJson(failure){
+async function showFailureJson(failure) {
   const modal = document.getElementById('failure-modal');
   const pre = document.getElementById('failure-json-pre');
   const sectionsEl = document.getElementById('failure-sections');
   const rawBtn = document.getElementById('failure-toggle-raw');
-  if(!modal || !pre || !sectionsEl) return;
+  if (!modal || !pre || !sectionsEl) return;
 
   openFailureModalLoading();
   const resolvedFailure = await resolveLatestFailure(failure);
   failure = resolvedFailure || failure;
 
   // pretty-print JSON for debug mode
-  try{
+  try {
     const pretty = JSON.stringify(failure, null, 2);
     pre.textContent = pretty;
-  }catch(e){
+  } catch (e) {
     pre.textContent = String(failure);
   }
 
   pre.style.display = 'none';
-  if(rawBtn){
+  if (rawBtn) {
     rawBtn.textContent = 'Show Raw JSON (Debug)';
     rawBtn.onclick = () => {
       const showing = pre.style.display === 'block';
@@ -400,13 +468,13 @@ async function showFailureJson(failure){
   // prepare DOM render button (for page_html if available, fallback to dom)
   const domContainer = document.getElementById('failure-dom-container');
   const renderBtn = document.getElementById('failure-render-dom');
-  if(renderBtn && domContainer){
+  if (renderBtn && domContainer) {
     const htmlContent = failure.page_html || failure.dom;
-    if(htmlContent){
+    if (htmlContent) {
       renderBtn.style.display = 'inline-block';
       domContainer.style.display = 'none';
       renderBtn.textContent = failure.page_html ? 'Render Page HTML' : 'Render DOM';
-      renderBtn.onclick = ()=>{
+      renderBtn.onclick = () => {
         // sanitize by not executing scripts: use sandboxed iframe with no allow-scripts
         domContainer.innerHTML = '';
         const iframe = document.createElement('iframe');
@@ -414,9 +482,9 @@ async function showFailureJson(failure){
         iframe.style.width = '100%';
         iframe.style.height = '500px';
         iframe.style.border = '0';
-        try{
+        try {
           iframe.srcdoc = htmlContent;
-        }catch(e){
+        } catch (e) {
           // fallback: show escaped HTML inside pre
           domContainer.innerHTML = `<pre style="white-space:pre-wrap;padding:8px;max-height:500px;overflow:auto">${escapeHtml(htmlContent)}</pre>`;
           domContainer.style.display = 'block';
@@ -426,7 +494,7 @@ async function showFailureJson(failure){
         domContainer.appendChild(iframe);
         domContainer.style.display = 'block';
       };
-    }else{
+    } else {
       renderBtn.style.display = 'none';
       domContainer.style.display = 'none';
     }
@@ -435,28 +503,28 @@ async function showFailureJson(failure){
   modal.style.display = 'flex';
 }
 
-function closeFailureModal(){
+function closeFailureModal() {
   const modal = document.getElementById('failure-modal');
-  if(modal) modal.style.display = 'none';
+  if (modal) modal.style.display = 'none';
 }
 
 // wire modal close
-document.addEventListener('click', (ev)=>{
+document.addEventListener('click', (ev) => {
   const target = ev.target;
-  if(target && target.id === 'failure-modal-close') closeFailureModal();
-  if(target && target.id === 'failure-overlay') closeFailureModal();
+  if (target && target.id === 'failure-modal-close') closeFailureModal();
+  if (target && target.id === 'failure-overlay') closeFailureModal();
 });
 
-function renderBots(bots){
+function renderBots(bots) {
   const tbody = document.getElementById('bots-tbody');
   tbody.innerHTML = '';
   const ids = Object.keys(bots).sort();
-  if(ids.length === 0){
+  if (ids.length === 0) {
     tbody.innerHTML = '<tr><td colspan="3" class="muted">No bots seen yet</td></tr>';
     return;
   }
-  const now = Date.now()/1000;
-  for(const id of ids){
+  const now = Date.now() / 1000;
+  for (const id of ids) {
     const info = bots[id] || {};
     const lastSeen = info.last_seen || 0;
     const age = Math.max(0, Math.round(now - lastSeen));
@@ -483,39 +551,39 @@ let historyActive = [];
 let doughnutChart = null;
 let lineChart = null;
 
-function createCharts(){
+function createCharts() {
   const dCtx = document.getElementById('doughnutChart').getContext('2d');
   doughnutChart = new Chart(dCtx, {
     type: 'doughnut',
     data: {
-      labels: ['Running','Failed'],
-      datasets: [{data: [0,0], backgroundColor: ['rgba(16,185,129,0.9)','rgba(239,68,68,0.9)'], hoverOffset:6}]
+      labels: ['Running', 'Failed'],
+      datasets: [{ data: [0, 0], backgroundColor: ['rgba(16,185,129,0.9)', 'rgba(239,68,68,0.9)'], hoverOffset: 6 }]
     },
-    options: {maintainAspectRatio:false, plugins:{legend:{position:'bottom'}}}
+    options: { maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } } }
   });
 
   const lCtx = document.getElementById('lineChart').getContext('2d');
   lineChart = new Chart(lCtx, {
     type: 'line',
-    data: {labels: [], datasets:[{label:'Active bots',data:[],borderColor:'rgba(96,165,250,0.9)',backgroundColor:'rgba(96,165,250,0.12)',tension:0.25,fill:true}]},
-    options: {maintainAspectRatio:false, scales:{y:{beginAtZero:true,precision:0}}}
+    data: { labels: [], datasets: [{ label: 'Active bots', data: [], borderColor: 'rgba(96,165,250,0.9)', backgroundColor: 'rgba(96,165,250,0.12)', tension: 0.25, fill: true }] },
+    options: { maintainAspectRatio: false, scales: { y: { beginAtZero: true, precision: 0 } } }
   });
 }
 
-function updateChartsFromData(bots){
+function updateChartsFromData(bots) {
   const ids = Object.keys(bots || {});
-  const now = Date.now()/1000;
+  const now = Date.now() / 1000;
   let running = 0;
-  for(const id of ids){
+  for (const id of ids) {
     const info = bots[id] || {};
     const lastSeen = info.last_seen || 0;
     const age = Math.max(0, Math.round(now - lastSeen));
-    if(age <= 10) running++;
+    if (age <= 10) running++;
   }
   const failed = Math.max(0, ids.length - running);
 
   // update doughnut
-  if(doughnutChart){
+  if (doughnutChart) {
     doughnutChart.data.datasets[0].data = [running, failed];
     doughnutChart.update();
   }
@@ -524,9 +592,9 @@ function updateChartsFromData(bots){
   const label = new Date().toLocaleTimeString();
   historyLabels.push(label);
   historyActive.push(running);
-  if(historyLabels.length > historyMax){ historyLabels.shift(); historyActive.shift(); }
+  if (historyLabels.length > historyMax) { historyLabels.shift(); historyActive.shift(); }
 
-  if(lineChart){
+  if (lineChart) {
     lineChart.data.labels = historyLabels.slice();
     lineChart.data.datasets[0].data = historyActive.slice();
     lineChart.update();
@@ -537,7 +605,7 @@ function updateChartsFromData(bots){
 document.getElementById('refresh-btn').addEventListener('click', fetchStatus);
 
 // create charts once DOM is ready
-try{ createCharts(); }catch(e){ console.warn('Charts not available yet', e); }
+try { createCharts(); } catch (e) { console.warn('Charts not available yet', e); }
 
 // Poll every 3 seconds
 fetchStatus();

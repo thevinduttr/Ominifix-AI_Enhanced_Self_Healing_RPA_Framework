@@ -186,10 +186,10 @@ def wait_and_run_healed_script(failed_at: float) -> bool:
                 os.environ["FORCE_HEALED_SCRIPT_PATH"] = healed_script
                 os.execv(sys.executable, [sys.executable, str(launcher_path)])
             except Exception as exec_err:
-                print(f"⚠️ Failed to restart launcher: {exec_err}")
+                print(f"Failed to restart launcher: {exec_err}")
         time.sleep(HEALING_POLL_INTERVAL_SECONDS)
 
-    print("⚠️ Healing wait timeout reached. Exiting failed run.")
+    print("Healing wait timeout reached. Exiting failed run.")
     return False
 
 
@@ -299,7 +299,7 @@ def fill_customer_onboarding_form(page, customer_data: dict) -> dict:
     page.wait_for_timeout(200)
 
     # XPath for Terms checkbox
-    customer_terms = require_locator(page, "xpath=//*[@id='customer-term'] | //input[@id='customer-term']")
+    customer_terms = require_locator(page, "xpath=//*[@id='customer-terms'] | //input[@id='customer-terms']")
     terms_checked = False
     if not customer_terms.is_checked():
         customer_terms.check()
